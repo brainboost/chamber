@@ -59,6 +59,44 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 ## Development
 
+### Git Worktree Workflow
+
+This project uses **git worktrees** for parallel development, allowing you to run long-lived dev servers while developing features.
+
+**Current worktree structure:**
+```
+D:/Projects/chamber     [main]  ← Production-ready code
+D:/Projects/chamber-dev [dev]   ← Active development
+```
+
+**Basic workflow:**
+```bash
+# Terminal 1: Main worktree - Run dev servers (keeps running!)
+cd chamber/
+npm run tauri:dev
+
+# Terminal 2: Dev worktree - Develop features
+cd ../chamber-dev/
+# Make changes, commit, test without stopping the dev server
+```
+
+**Create additional worktrees:**
+```bash
+# For experiments, PRs, or parallel work
+git worktree add ../chamber-experiment -b experiment-branch
+git worktree add ../chamber-staging staging
+
+# See all worktrees
+git worktree list
+
+# Remove when done
+git worktree remove ../chamber-experiment
+```
+
+For detailed git workflows, see [GIT_WORKFLOWS.md](GIT_WORKFLOWS.md).
+
+### Running the Application
+
 Run the application in development mode:
 
 ```bash
