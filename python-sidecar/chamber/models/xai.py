@@ -2,7 +2,7 @@
 
 import os
 
-from langchain_classic import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from langchain_core.language_models import BaseChatModel
 
 from chamber.models.base import BaseLLMProvider

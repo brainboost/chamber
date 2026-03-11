@@ -3,7 +3,17 @@
     "allow": [
       "Bash(dir:*)",
       "Bash(git add:*)",
-      "Bash(rustc --version && cargo --version)"
+      "Bash(rustc --version && cargo --version)",
+      "Bash(cd python-sidecar:*)",
+      "Bash(uv --version)",
+      "Bash(uv python:*)",
+      "Bash(uv sync:*)",
+      "Bash(uv venv:*)",
+      "Bash(rm -rf python-sidecar/.venv && cd python-sidecar && uv venv --python 3.13)",
+      "Bash(uv run:*)",
+      "Bash(cd .. && npm run dev)",
+      "Bash(npm run:*)",
+      "Bash(netstat -ano | grep :1420 || echo \"Nothing on port 1420\")"
     ]
   }
 }

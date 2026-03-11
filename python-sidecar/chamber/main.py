@@ -9,14 +9,8 @@ from pathlib import Path
 
 import uvicorn
 
+from chamber.logging_config import setup_logging_from_config
 from chamber.server.app import create_app
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +33,20 @@ def parse_args():
     parser.add_argument(
         "--log-level",
         type=str,
-        default="info",
+        default=None,
         choices=["debug", "info", "warning", "error"],
-        help="Log level (default: info)",
+        help="Log level (overrides config file)",
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to config file",
+    )
+    parser.add_argument(
+        "--no-file-log",
+        action="store_true",
+        help="Disable file logging",
     )
     return parser.parse_args()
 
@@ -50,21 +55,29 @@ def main():
     """Main entry point."""
     args = parse_args()
 
-    # Set log level
-    log_level = getattr(logging, args.log_level.upper())
-    logging.getLogger().setLevel(log_level)
+    # Setup logging from config file
+    setup_logging_from_config(args.config)
+
+    # Override log level if specified
+    if args.log_level:
+        logging.getLogger().setLevel(getattr(logging, args.log_level.upper()))
 
     logger.info(f"Starting Chamber Sidecar on {args.host}:{args.port}")
+    logger.debug(f"Python version: {sys.version}")
+    logger.debug(f"Working directory: {Path.cwd()}")
 
     # Create FastAPI app
     app = create_app()
+
+    # Determine log level for uvicorn
+    log_level = args.log_level or logging.getLevelName(logging.getLogger().level)
 
     # Run server
     uvicorn.run(
         app,
         host=args.host,
         port=args.port,
-        log_level=args.log_level,
+        log_level=log_level.lower(),
         access_log=True,
     )
 

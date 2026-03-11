@@ -46,9 +46,35 @@ workspace:
   sessions_dir: "sessions"
   config_dir: "config"
 
+# Logging Configuration
+logging:
+  # Log level: debug, info, warning, error
+  level: "info"
+
+  # Output destinations
+  console:
+    enabled: true
+    format: "colored"  # colored, text, json
+
+  file:
+    enabled: true
+    path: "${HOME}/.chamber/logs/chamber.log"
+    max_size_mb: 10
+    backup_count: 5
+    format: "text"  # text, json
+
+  # Component-specific log levels
+  components:
+    sidecar: "info"
+    tauri: "info"
+    llm: "info"
+    tools: "debug"
+    websocket: "debug"
+
 # Python Sidecar Configuration
 sidecar:
   host: "127.0.0.1"
   port: 8765
   health_check_interval_seconds: 30
   max_restart_attempts: 3
+  log_level: "info"  # Override global logging level for sidecar

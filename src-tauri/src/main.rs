@@ -9,6 +9,7 @@ use chamber::commands::sidecar::{
 use chamber::commands::workspace::{
     append_to_history, init_workspace, list_sessions, load_session_history, save_plan,
 };
+use chamber::logging::{init_default_logging, setup_logging, LoggingConfig};
 use chamber::services::SidecarManager;
 use chamber::utils::get_default_workspace_path;
 use std::sync::{Arc, Mutex};
@@ -16,8 +17,13 @@ use tauri::Manager;
 use tokio::sync::Mutex as TokioMutex;
 
 fn main() {
+    // Initialize logging
+    init_default_logging();
+    tracing::info!("Starting Chamber application");
+
     // Initialize workspace path
     let workspace_path = get_default_workspace_path();
+    tracing::info!("Workspace path: {:?}", workspace_path);
 
     // Initialize app state
     let app_state = AppState {
@@ -60,6 +66,8 @@ fn main() {
             chamber::commands::session::resume_session,
         ])
         .setup(|app| {
+            tracing::debug!("Setting up application");
+
             // Initialize sidecar manager on startup
             let config = chamber::models::config::SidecarConfig {
                 host: "127.0.0.1".to_string(),
@@ -74,17 +82,39 @@ fn main() {
             tauri::async_runtime::block_on(async {
                 let mut manager = sidecar_state.manager.lock().await;
                 *manager = Some(sidecar_manager);
+                tracing::info!("Sidecar manager initialized");
             });
 
             // Initialize workspace
             let workspace_path = get_default_workspace_path();
             let workspace_manager = chamber::services::WorkspaceManager::new(&workspace_path);
             if let Err(e) = workspace_manager.init_workspace() {
-                eprintln!("Failed to initialize workspace: {}", e);
+                tracing::error!("Failed to initialize workspace: {}", e);
+            } else {
+                tracing::info!("Workspace initialized successfully");
+            }
+
+            // Load and apply logging configuration
+            if let Ok(config) = load_config_from_workspace(&workspace_path) {
+                if let Some(logging_config) = config.get("logging") {
+                    if let Ok(log_config) = serde_yaml::from_value::<LoggingConfig>(logging_config.clone()) {
+                        tracing::info!("Applying logging configuration from workspace");
+                        if let Err(e) = setup_logging(&log_config) {
+                            tracing::warn!("Failed to apply logging config: {}", e);
+                        }
+                    }
+                }
             }
 
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn load_config_from_workspace(workspace_path: &std::path::Path) -> Result<serde_yaml::Mapping, Box<dyn std::error::Error>> {
+    let config_path = workspace_path.join("config").join("chamber-config.yaml");
+    let contents = std::fs::read_to_string(config_path)?;
+    let config: serde_yaml::Value = serde_yaml::from_str(&contents)?;
+    Ok(config.as_mapping().cloned().unwrap_or_default())
 }
