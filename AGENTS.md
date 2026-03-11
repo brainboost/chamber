@@ -41,8 +41,9 @@ npm run check        # Type check SvelteKit
 npm run build        # Production build
 
 cd python-sidecar
-python -m chamber.main --host 127.0.0.1 --port 8765  # Run Python sidecar
-pytest              # Run Python tests
+uv run python -m chamber.main --host 127.0.0.1 --port 8765  # Run Python sidecar
+uv run pytest       # Run Python tests
+uv sync             # Install dependencies
 
 cd src-tauri
 cargo test          # Run Rust tests
@@ -172,7 +173,7 @@ pwd                   # Check which worktree you're in
 ### Runtime Issues
 - Check `.env` file has required keys
 - Check `workspace/config/chamber-config.yaml`
-- Verify Python dependencies: `cd python-sidecar && pip install -e .`
+- Verify Python dependencies: `cd python-sidecar && uv sync`
 
 ## Memory Files
 

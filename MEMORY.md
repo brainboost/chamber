@@ -97,9 +97,9 @@ npm run tauri:build  # Build production binaries
 ### Python Sidecar
 ```bash
 cd python-sidecar
-pip install -e .                    # Install dependencies
-python -m chamber.main --host 127.0.0.1 --port 8765  # Run standalone
-pytest                              # Run tests
+uv sync                             # Install dependencies (using uv)
+uv run python -m chamber.main --host 127.0.0.1 --port 8765  # Run standalone
+uv run pytest                       # Run tests
 ```
 
 ### Rust Backend
@@ -141,8 +141,9 @@ chamber/
 ## Configuration
 
 ### Environment Variables
-- `.env` file in `python-sidecar/` directory
+- `.env` file in root directory
 - Required: `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `XAI_API_KEY`, `OLLAMA_BASE_URL`
+- Note: This project uses `uv` for Python dependency management (not pip)
 
 ### App Configuration
 - Located at: `workspace/config/chamber-config.yaml`

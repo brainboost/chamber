@@ -6,6 +6,11 @@ This file contains project-specific guidance for Claude Code when working on the
 
 **Chamber** is a multi-model AI application using Tauri 2.0 + SvelteKit + Rust + Python (LangGraph). It enables human-in-the-loop AI workflows with multiple LLM providers.
 
+**Package Managers:**
+- Node.js: npm
+- Python: **uv** (fast Python package installer, not pip)
+- Rust: cargo
+
 ## Quick Reference
 
 - **Stack**: Tauri 2.0, SvelteKit, Rust, Python (FastAPI + LangGraph)
@@ -119,10 +124,11 @@ npm run check        # Type check
 npm run tauri:dev    # Development build
 npm run tauri:build  # Production build
 
-# Python
+# Python (using uv)
 cd python-sidecar
-python -m chamber.main --host 127.0.0.1 --port 8765
-pytest
+uv sync                           # Install dependencies
+uv run python -m chamber.main     # Run server
+uv run pytest                     # Run tests
 
 # Rust
 cd src-tauri
@@ -187,13 +193,16 @@ chamber-dev/     [dev]   ← Active development
 ### Build Errors
 - Check Node.js version (18+)
 - Check Rust version (1.70+)
+- Check Python version (3.10+)
 - Clear node_modules: `rm -rf node_modules && npm install`
+- Clear Python venv: `cd python-sidecar && rm -rf .venv && uv sync`
 - Clear build artifacts: `rm -rf build .svelte-kit`
 
 ### Runtime Errors
-- Check Python dependencies: `cd python-sidecar && pip install -e .`
+- Check Python dependencies: `cd python-sidecar && uv sync`
 - Check environment variables in `.env`
 - Check configuration in `workspace/config/chamber-config.yaml`
+- Ensure uv is installed: `uv --version`
 
 ### Git Issues
 - Use `git worktree prune` to clean stale references

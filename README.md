@@ -36,9 +36,9 @@ Chamber is a professional AI application that enables multi-model reasoning with
 # Install dependencies
 npm install
 
-# Install Python dependencies
+# Install Python dependencies (using uv)
 cd python-sidecar
-pip install -e .
+uv sync
 cd ..
 
 # Setup environment variables
@@ -108,7 +108,7 @@ npm run tauri:dev
 
 # Terminal 3 (optional): Run Python sidecar standalone for testing
 cd python-sidecar
-python -m chamber.main --host 127.0.0.1 --port 8765
+uv run python -m chamber.main --host 127.0.0.1 --port 8765
 ```
 
 ## Configuration
@@ -150,7 +150,7 @@ cargo test
 
 # Python tests
 cd python-sidecar
-pytest
+uv run pytest
 ```
 
 ## Building

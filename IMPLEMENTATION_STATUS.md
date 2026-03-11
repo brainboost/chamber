@@ -121,10 +121,10 @@
    ```bash
    # Terminal 1: Install Python dependencies
    cd python-sidecar
-   pip install -e .
+   uv sync
 
    # Terminal 2: Test Python sidecar
-   python -m chamber.main
+   uv run python -m chamber.main
 
    # Terminal 3: Test Rust compilation
    cd src-tauri
