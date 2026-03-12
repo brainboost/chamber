@@ -4,6 +4,13 @@ export interface ChamberConfig {
   tools: ToolsConfig;
   workspace: WorkspaceConfig;
   sidecar: SidecarConfig;
+  ui: UIConfig;
+}
+
+export type ThemeMode = 'light' | 'dark' | 'system';
+
+export interface UIConfig {
+  theme: ThemeMode;
 }
 
 export interface OrchestratorConfig {

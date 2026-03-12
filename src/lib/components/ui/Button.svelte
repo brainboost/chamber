@@ -20,11 +20,11 @@
   } = $props();
 
   const variants = {
-    default: 'bg-gray-200 text-gray-900 hover:bg-gray-300',
-    primary: 'bg-blue-600 text-white hover:bg-blue-700',
-    secondary: 'bg-gray-600 text-white hover:bg-gray-700',
-    danger: 'bg-red-600 text-white hover:bg-red-700',
-    ghost: 'bg-transparent hover:bg-gray-100 text-gray-900',
+    default: 'bg-gray-200 text-gray-900 hover:bg-gray-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600',
+    primary: 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600',
+    secondary: 'bg-gray-600 text-white hover:bg-gray-700 dark:bg-slate-700 dark:hover:bg-slate-600',
+    danger: 'bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600',
+    ghost: 'bg-transparent hover:bg-gray-100 text-gray-900 dark:hover:bg-slate-800 dark:text-slate-100',
   };
 
   const sizes = {

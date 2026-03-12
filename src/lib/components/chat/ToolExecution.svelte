@@ -21,7 +21,7 @@
 </script>
 
 <div class="flex justify-start">
-  <Card class="max-w-[85%] bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+  <Card class="max-w-[85%] bg-gradient-to-br from-green-50 to-emerald-50 dark:from-emerald-900/10 dark:to-green-900/10 border-green-200 dark:border-emerald-800">
     <div class="p-4">
       <!-- Header -->
       <button
@@ -35,10 +35,10 @@
         </div>
         <div class="flex-1 text-left">
           <div class="flex items-center gap-2">
-            <h3 class="font-semibold text-gray-900">Tool: {execution.tool_name}</h3>
+            <h3 class="font-semibold text-gray-900 dark:text-slate-100">Tool: {execution.tool_name}</h3>
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4 text-gray-500 transition-transform {isExpanded ? 'rotate-180' : ''}"
+              class="h-4 w-4 text-gray-500 dark:text-slate-400 transition-transform {isExpanded ? 'rotate-180' : ''}"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -46,23 +46,23 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
           </div>
-          <span class="text-xs text-green-700">Executed successfully</span>
+          <span class="text-xs text-green-700 dark:text-emerald-400">Executed successfully</span>
         </div>
       </button>
 
       {#if isExpanded}
         <!-- Parameters -->
         <div class="mt-3 mb-3">
-          <h4 class="text-xs font-semibold text-gray-600 mb-2">Parameters:</h4>
-          <div class="bg-white/50 rounded-md p-3 font-mono text-xs overflow-x-auto">
+          <h4 class="text-xs font-semibold text-gray-600 dark:text-slate-400 mb-2">Parameters:</h4>
+          <div class="bg-white/50 dark:bg-slate-900/50 rounded-md p-3 font-mono text-xs overflow-x-auto text-gray-900 dark:text-slate-100">
             <pre>{JSON.stringify(execution.parameters, null, 2)}</pre>
           </div>
         </div>
 
         <!-- Result -->
         <div>
-          <h4 class="text-xs font-semibold text-gray-600 mb-2">Result:</h4>
-          <div class="bg-white/50 rounded-md p-3 font-mono text-xs overflow-x-auto">
+          <h4 class="text-xs font-semibold text-gray-600 dark:text-slate-400 mb-2">Result:</h4>
+          <div class="bg-white/50 dark:bg-slate-900/50 rounded-md p-3 font-mono text-xs overflow-x-auto text-gray-900 dark:text-slate-100">
             <pre>{JSON.stringify(execution.result, null, 2)}</pre>
           </div>
         </div>

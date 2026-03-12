@@ -40,8 +40,8 @@
         </div>
         <div class="flex-1">
           <div class="flex items-center gap-2">
-            <h3 class="font-semibold text-gray-900">{stepLabel}</h3>
-            <span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+            <h3 class="font-semibold text-gray-900 dark:text-slate-100">{stepLabel}</h3>
+            <span class="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full">
               {reasoning.model}
             </span>
           </div>
@@ -49,7 +49,7 @@
       </div>
 
       <!-- Content -->
-      <div class="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+      <div class="text-gray-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
         {reasoning.content}
       </div>
     </div>

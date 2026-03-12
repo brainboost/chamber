@@ -37,7 +37,7 @@
 </script>
 
 <div class="flex justify-start">
-  <Card class="max-w-[85%] bg-gradient-to-br from-orange-50 to-yellow-50 border-orange-200 border-2">
+  <Card class="max-w-[85%] bg-gradient-to-br from-orange-50 to-yellow-50 dark:from-orange-900/10 dark:to-yellow-900/10 border-orange-200 dark:border-orange-800 border-2">
     <div class="p-4">
       <!-- Header -->
       <button
@@ -51,10 +51,10 @@
         </div>
         <div class="flex-1 text-left">
           <div class="flex items-center gap-2">
-            <h3 class="font-semibold text-gray-900">🔧 Tool Approval Required</h3>
+            <h3 class="font-semibold text-gray-900 dark:text-slate-100">🔧 Tool Approval Required</h3>
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4 text-gray-500 transition-transform {isExpanded ? 'rotate-180' : ''}"
+              class="h-4 w-4 text-gray-500 dark:text-slate-400 transition-transform {isExpanded ? 'rotate-180' : ''}"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -62,23 +62,23 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
           </div>
-          <span class="text-sm text-orange-700 font-medium">{request.tool_name}</span>
+          <span class="text-sm text-orange-700 dark:text-orange-400 font-medium">{request.tool_name}</span>
         </div>
       </button>
 
       {#if isExpanded}
         <!-- Reasoning -->
         <div class="mb-4">
-          <h4 class="text-xs font-semibold text-gray-600 mb-2">Reasoning:</h4>
-          <p class="text-sm text-gray-700 bg-white/50 rounded-md p-3">
+          <h4 class="text-xs font-semibold text-gray-600 dark:text-slate-400 mb-2">Reasoning:</h4>
+          <p class="text-sm text-gray-700 dark:text-slate-200 bg-white/50 dark:bg-slate-900/50 rounded-md p-3">
             {request.reasoning}
           </p>
         </div>
 
         <!-- Parameters -->
         <div class="mb-4">
-          <h4 class="text-xs font-semibold text-gray-600 mb-2">Parameters:</h4>
-          <div class="bg-white/50 rounded-md p-3 font-mono text-xs overflow-x-auto">
+          <h4 class="text-xs font-semibold text-gray-600 dark:text-slate-400 mb-2">Parameters:</h4>
+          <div class="bg-white/50 dark:bg-slate-900/50 rounded-md p-3 font-mono text-xs overflow-x-auto text-gray-900 dark:text-slate-100">
             <pre>{JSON.stringify(request.parameters, null, 2)}</pre>
           </div>
         </div>

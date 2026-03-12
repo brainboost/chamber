@@ -19,7 +19,11 @@
     try {
       isLoading = true;
       error = null;
-      session = await sessionStore.getSession(sessionId);
+      if (sessionId) {
+        session = await sessionStore.getSession(sessionId);
+      } else {
+        error = "No session ID provided";
+      }
     } catch (err) {
       console.error('Failed to load session:', err);
       error = err instanceof Error ? err.message : 'Failed to load session';
@@ -132,7 +136,7 @@
 
     <!-- Chat Interface -->
     <div class="flex-1 overflow-hidden">
-      <ChatInterface {sessionId} />
+      <ChatInterface sessionId={sessionId || ''} />
     </div>
   {/if}
 </div>

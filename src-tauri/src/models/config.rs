@@ -7,6 +7,26 @@ pub struct ChamberConfig {
     pub tools: ToolsConfig,
     pub workspace: WorkspaceConfig,
     pub sidecar: SidecarConfig,
+    #[serde(default)]
+    pub ui: UIConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UIConfig {
+    #[serde(default = "default_ui_theme")]
+    pub theme: String, // "light", "dark", "system"
+}
+
+impl Default for UIConfig {
+    fn default() -> Self {
+        Self {
+            theme: default_ui_theme(),
+        }
+    }
+}
+
+fn default_ui_theme() -> String {
+    "system".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,6 +136,7 @@ impl Default for ChamberConfig {
                 health_check_interval_seconds: 30,
                 max_restart_attempts: 3,
             },
+            ui: UIConfig::default(),
         }
     }
 }

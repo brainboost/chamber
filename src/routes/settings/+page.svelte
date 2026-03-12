@@ -55,8 +55,8 @@
 <div class="p-8 max-w-4xl mx-auto">
   <!-- Header -->
   <div class="mb-8">
-    <h1 class="text-4xl font-bold text-900 mb-2">Settings</h1>
-    <p class="text-gray-600">Configure your chamber models and workspace</p>
+    <h1 class="text-4xl font-bold text-gray-900 dark:text-slate-100 mb-2">Settings</h1>
+    <p class="text-gray-600 dark:text-slate-400">Configure your chamber models and workspace</p>
   </div>
 
   {#if !localConfig}
@@ -70,8 +70,8 @@
     {#if saveMessage}
       <div
         class="mb-6 p-4 rounded-lg {saveMessage.type === 'success'
-          ? 'bg-green-50 text-green-800 border border-green-200'
-          : 'bg-red-50 text-red-800 border border-red-200'}"
+          ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-800'
+          : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-400 border border-red-200 dark:border-red-800'}"
       >
         <div class="flex items-center gap-2">
           {#if saveMessage.type === "success"}
@@ -108,15 +108,15 @@
 
     <!-- Orchestrator Section -->
     <Card class="p-6 mb-6">
-      <h2 class="text-xl font-bold text-gray-900 mb-4">Orchestrator Model</h2>
-      <p class="text-sm text-gray-600 mb-4">
+      <h2 class="text-xl font-bold text-gray-900 dark:text-slate-100 mb-4">Orchestrator Model</h2>
+      <p class="text-sm text-gray-600 dark:text-slate-400 mb-4">
         The orchestrator coordinates the multi-model chamber and synthesizes
         responses.
       </p>
 
       <div class="space-y-4">
         <div>
-          <label for="orchestrator-provider" class="block text-sm font-medium text-gray-700 mb-2"
+          <label for="orchestrator-provider" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2"
             >Provider</label
           >
           <Input
@@ -126,7 +126,7 @@
           />
         </div>
         <div>
-          <label for="orchestrator-model" class="block text-sm font-medium text-gray-700 mb-2"
+          <label for="orchestrator-model" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2"
             >Model</label
           >
           <Input
@@ -140,8 +140,8 @@
 
     <!-- Reasoning Models Section -->
     <Card class="p-6 mb-6">
-      <h2 class="text-xl font-bold text-gray-900 mb-4">Reasoning Models</h2>
-      <p class="text-sm text-gray-600 mb-4">
+      <h2 class="text-xl font-bold text-gray-900 dark:text-slate-100 mb-4">Reasoning Models</h2>
+      <p class="text-sm text-gray-600 dark:text-slate-400 mb-4">
         Multiple models that work together to reason about your requests.
       </p>
 
@@ -149,7 +149,7 @@
         {#each localConfig.reasoning_models as model, i}
           <div class="border-l-4 border-blue-500 pl-4">
             <div class="flex items-center justify-between mb-3">
-              <h3 class="font-semibold text-gray-900">Model {i + 1}</h3>
+              <h3 class="font-semibold text-gray-900 dark:text-slate-100">Model {i + 1}</h3>
               <label for="model-enabled-{i}" class="flex items-center gap-2 cursor-pointer">
                 <input
                   id="model-enabled-{i}"
@@ -157,18 +157,18 @@
                   bind:checked={model.enabled}
                   class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                 />
-                <span class="text-sm text-gray-700">Enabled</span>
+                <span class="text-sm text-gray-700 dark:text-slate-300">Enabled</span>
               </label>
             </div>
             <div class="space-y-3">
               <div>
-                <label for="reasoning-provider-{i}" class="block text-sm font-medium text-gray-700 mb-1"
+                <label for="reasoning-provider-{i}" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1"
                   >Provider</label
                 >
                 <Input id="reasoning-provider-{i}" bind:value={model.provider} />
               </div>
               <div>
-                <label for="reasoning-model-{i}" class="block text-sm font-medium text-gray-700 mb-1"
+                <label for="reasoning-model-{i}" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1"
                   >Model</label
                 >
                 <Input id="reasoning-model-{i}" bind:value={model.model} />
@@ -181,14 +181,14 @@
 
     <!-- Workspace Section -->
     <Card class="p-6 mb-6">
-      <h2 class="text-xl font-bold text-gray-900 mb-4">Workspace</h2>
-      <p class="text-sm text-gray-600 mb-4">
+      <h2 class="text-xl font-bold text-gray-900 dark:text-slate-100 mb-4">Workspace</h2>
+      <p class="text-sm text-gray-600 dark:text-slate-400 mb-4">
         Configure where your session files and history are stored.
       </p>
 
       <div class="space-y-4">
         <div>
-          <label for="workspace-path" class="block text-sm font-medium text-gray-700 mb-2"
+          <label for="workspace-path" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2"
             >Workspace Path</label
           >
           <Input
@@ -198,7 +198,7 @@
           />
         </div>
         <div>
-          <label for="sessions-dir" class="block text-sm font-medium text-gray-700 mb-2"
+          <label for="sessions-dir" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2"
             >Sessions Directory</label
           >
           <Input
@@ -208,7 +208,7 @@
           />
         </div>
         <div>
-          <label for="config-dir" class="block text-sm font-medium text-gray-700 mb-2"
+          <label for="config-dir" class="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2"
             >Config Directory</label
           >
           <Input
@@ -222,8 +222,8 @@
 
     <!-- Tool Approval Section -->
     <Card class="p-6 mb-6">
-      <h2 class="text-xl font-bold text-gray-900 mb-4">Tool Approval</h2>
-      <p class="text-sm text-gray-600 mb-4">
+      <h2 class="text-xl font-bold text-gray-900 dark:text-slate-100 mb-4">Tool Approval</h2>
+      <p class="text-sm text-gray-600 dark:text-slate-400 mb-4">
         Configure which tools require human approval before execution.
       </p>
 
@@ -234,7 +234,7 @@
           bind:checked={localConfig.tools.approval_required}
           class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
         />
-        <span class="text-sm text-gray-700">Require approval for all tools</span
+        <span class="text-sm text-gray-700 dark:text-slate-300">Require approval for all tools</span
         >
       </label>
     </Card>
