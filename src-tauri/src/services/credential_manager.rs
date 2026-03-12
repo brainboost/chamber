@@ -126,24 +126,49 @@ impl CredentialManager {
 
     /// Refresh OAuth token if needed
     pub async fn refresh_token_if_needed(&self, provider: &str) -> Result<Option<Credential>> {
+        tracing::debug!("Checking if token refresh needed for provider: {}", provider);
+
         if let Some(credential) = self.get_credential(provider).await? {
             if credential.needs_refresh() {
-                tracing::info!("Refreshing OAuth token for provider: {}", provider);
+                tracing::info!("Token refresh needed for provider: {}", provider);
+
+                // Log token expiry info
+                if let AuthType::OAuthToken { expires_at, .. } = &credential.auth_type {
+                    if let Some(expiry) = expires_at {
+                        let now = chrono::Utc::now().timestamp();
+                        let minutes_until_expiry = (expiry - now) / 60;
+                        tracing::info!("Token expires in {} minutes", minutes_until_expiry);
+                    }
+                }
+
                 let refreshed = self.refresh_oauth_token(&credential).await?;
                 self.store_credential(refreshed.clone()).await?;
+                tracing::info!("Successfully refreshed token for provider: {}", provider);
                 return Ok(Some(refreshed));
+            } else {
+                tracing::debug!("Token is still valid for provider: {}", provider);
             }
+        } else {
+            tracing::debug!("No credential found for provider: {}", provider);
         }
+
         Ok(None)
     }
 
     /// Refresh an OAuth token
     async fn refresh_oauth_token(&self, credential: &Credential) -> Result<Credential> {
+        tracing::debug!("Starting token refresh for provider: {}", credential.provider);
+
         let config = OAuthConfig::for_provider(&credential.provider)
             .ok_or_else(|| anyhow!("No OAuth config for provider: {}", credential.provider))?;
 
+        tracing::debug!("Using token endpoint: {}", config.token_url);
+
         let refresh_token = match &credential.auth_type {
-            AuthType::OAuthToken { refresh_token, .. } => refresh_token.clone(),
+            AuthType::OAuthToken { refresh_token, .. } => {
+                tracing::trace!("Using refresh token (length: {})", refresh_token.len());
+                refresh_token.clone()
+            }
             AuthType::ApiKey { .. } => {
                 return Err(anyhow!("Cannot refresh API key credential"));
             }
@@ -158,7 +183,10 @@ impl CredentialManager {
         // Add client_id for Google
         if let Some(client_id) = &config.client_id {
             params.insert("client_id", client_id);
+            tracing::trace!("Using client_id for token refresh");
         }
+
+        tracing::debug!("Sending refresh request to token endpoint");
 
         let response = client
             .post(&config.token_url)
@@ -167,8 +195,12 @@ impl CredentialManager {
             .await
             .context("Failed to send refresh request")?;
 
+        let status = response.status();
+        tracing::debug!("Token refresh response status: {}", status);
+
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
+            tracing::error!("Token refresh failed with status {}: {}", status, error_text);
             return Err(anyhow!("Token refresh failed: {}", error_text));
         }
 
@@ -177,8 +209,12 @@ impl CredentialManager {
             .await
             .context("Failed to parse token response")?;
 
+        tracing::info!("Successfully received new access token");
+
         let expires_at = token_response.expires_in.map(|duration| {
-            chrono::Utc::now().timestamp() + duration as i64
+            let expiry = chrono::Utc::now().timestamp() + duration as i64;
+            tracing::info!("New token expires in {} seconds", duration);
+            expiry
         });
 
         Ok(Credential::oauth_token(
@@ -194,6 +230,8 @@ impl CredentialManager {
 
     /// Generate PKCE code verifier and challenge
     pub fn generate_pkce_verifier() -> Result<(String, String)> {
+        tracing::trace!("Generating PKCE verifier and challenge");
+
         // Generate random code verifier (43-128 characters)
         let mut rng = rand::thread_rng();
         let verifier: String = (0..64)
@@ -202,6 +240,8 @@ impl CredentialManager {
                 chars[rng.gen_range(0..chars.len())] as char
             })
             .collect();
+
+        tracing::trace!("Generated code verifier (length: {})", verifier.len());
 
         // Create code challenge by hashing verifier with SHA256
         let mut hasher = Sha256::new();
@@ -212,6 +252,8 @@ impl CredentialManager {
         let challenge = base64::engine::general_purpose::URL_SAFE_NO_PAD
             .encode(hash);
 
+        tracing::trace!("Generated code challenge (length: {})", challenge.len());
+
         Ok((verifier, challenge))
     }
 
@@ -221,8 +263,15 @@ impl CredentialManager {
         code_challenge: &str,
         state: &str,
     ) -> Result<String> {
+        tracing::debug!("Generating authorization URL for provider: {}", provider);
+        tracing::trace!("Using state parameter: {}", state);
+
         let config = OAuthConfig::for_provider(provider)
             .ok_or_else(|| anyhow!("No OAuth config for provider: {}", provider))?;
+
+        tracing::debug!("OAuth config - auth_url: {}, token_url: {}",
+            config.auth_url, config.token_url);
+        tracing::debug!("OAuth scopes: {}", config.scopes.join(", "));
 
         let mut url = url::Url::parse(&config.auth_url)?;
 
@@ -241,10 +290,14 @@ impl CredentialManager {
             // Add client_id for Google
             if let Some(client_id) = &config.client_id {
                 query_pairs.append_pair("client_id", client_id);
+                tracing::trace!("Using client_id for OAuth flow");
             }
         }
 
-        Ok(url.to_string())
+        let auth_url = url.to_string();
+        tracing::info!("Generated authorization URL for provider: {}", provider);
+
+        Ok(auth_url)
     }
 
     /// Exchange authorization code for tokens
@@ -253,8 +306,13 @@ impl CredentialManager {
         code: &str,
         code_verifier: &str,
     ) -> Result<Credential> {
+        tracing::info!("Exchanging authorization code for tokens for provider: {}", provider);
+        tracing::debug!("Authorization code length: {}", code.len());
+
         let config = OAuthConfig::for_provider(provider)
             .ok_or_else(|| anyhow!("No OAuth config for provider: {}", provider))?;
+
+        tracing::debug!("Token endpoint: {}", config.token_url);
 
         let client = reqwest::Client::new();
         let mut params = HashMap::new();
@@ -266,7 +324,10 @@ impl CredentialManager {
         // Add client_id for Google
         if let Some(client_id) = &config.client_id {
             params.insert("client_id", client_id);
+            tracing::trace!("Using client_id for token exchange");
         }
+
+        tracing::debug!("Sending token exchange request");
 
         let response = client
             .post(&config.token_url)
@@ -275,8 +336,28 @@ impl CredentialManager {
             .await
             .context("Failed to send token request")?;
 
+        let status = response.status();
+        tracing::debug!("Token exchange response status: {}", status);
+
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
+            tracing::error!("Token exchange failed with status {}: {}", status, error_text);
+
+            // Provide more helpful error messages based on common OAuth errors
+            if error_text.contains("invalid_grant") {
+                return Err(anyhow!(
+                    "Authorization code is invalid or expired. Please try the OAuth flow again."
+                ));
+            } else if error_text.contains("redirect_uri_mismatch") {
+                return Err(anyhow!(
+                    "Redirect URI mismatch. Please check the OAuth configuration."
+                ));
+            } else if error_text.contains("invalid_client") {
+                return Err(anyhow!(
+                    "Invalid client ID. Please check the OAuth configuration."
+                ));
+            }
+
             return Err(anyhow!("Token exchange failed: {}", error_text));
         }
 
@@ -285,13 +366,23 @@ impl CredentialManager {
             .await
             .context("Failed to parse token response")?;
 
+        tracing::info!("Successfully exchanged authorization code for tokens");
+
         let expires_at = token_response.expires_in.map(|duration| {
-            chrono::Utc::now().timestamp() + duration as i64
+            let expiry = chrono::Utc::now().timestamp() + duration as i64;
+            tracing::info!("Access token expires in {} seconds", duration);
+            expiry
         });
 
         let refresh_token = token_response
             .refresh_token
-            .ok_or_else(|| anyhow!("No refresh token in response"))?;
+            .ok_or_else(|| {
+                tracing::error!("No refresh token in OAuth response");
+                anyhow!("No refresh token in response")
+            })?;
+
+        tracing::info!("Successfully obtained OAuth tokens (refresh token length: {})",
+            refresh_token.len());
 
         Ok(Credential::oauth_token(
             provider.to_string(),
