@@ -74,6 +74,9 @@ fn main() {
             chamber::commands::auth::list_credentials,
             chamber::commands::auth::has_credential,
             chamber::commands::auth::refresh_credential,
+            // Migration commands
+            chamber::commands::migration::migrate_from_env_file,
+            chamber::commands::migration::check_env_file_for_migration,
         ])
         .setup(|app| {
             tracing::debug!("Setting up application");

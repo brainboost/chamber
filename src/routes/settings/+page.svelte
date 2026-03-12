@@ -10,6 +10,7 @@
     authError,
     clearAuthError,
   } from "$lib/stores/credentials";
+  import { checkEnvFileForMigration, migrateFromEnvFile } from "$lib/services/auth";
   import OAuthModal from "$lib/components/auth/OAuthModal.svelte";
   import type { ChamberConfig } from "$lib/types/config";
   import { onMount } from "svelte";
@@ -19,6 +20,11 @@
   let saveMessage = $state<{ type: "success" | "error"; text: string } | null>(
     null,
   );
+
+  // Migration states
+  let hasEnvFile = $state(false);
+  let isMigrating = $state(false);
+  let migrationComplete = $state<string[] | null>(null);
 
   // API key input states
   let apiKeyInputs = $state<Record<string, string>>({
@@ -38,6 +44,8 @@
     localConfig = $config ? JSON.parse(JSON.stringify($config)) : null;
     // Load credentials
     await loadCredentials();
+    // Check for migration opportunity
+    hasEnvFile = await checkEnvFileForMigration();
   });
 
   async function handleSave() {
@@ -133,6 +141,50 @@
     };
     return names[provider] || provider;
   }
+
+  // Migration handlers
+  async function handleMigrateFromEnv() {
+    try {
+      isMigrating = true;
+      saveMessage = null;
+
+      const migrated = await migrateFromEnvFile();
+
+      if (migrated.length > 0) {
+        migrationComplete = migrated;
+        saveMessage = {
+          type: "success",
+          text: `Successfully migrated ${migrated.length} provider(s): ${migrated.join(", ")}`
+        };
+        // Reload credentials to show migrated ones
+        await loadCredentials();
+        hasEnvFile = false; // Don't show migration again
+      } else {
+        saveMessage = {
+          type: "success",
+          text: "No new credentials to migrate. They may already be in your keychain."
+        };
+      }
+
+      setTimeout(() => {
+        migrationComplete = null;
+        saveMessage = null;
+      }, 5000);
+    } catch (error) {
+      console.error("Migration failed:", error);
+      saveMessage = {
+        type: "error",
+        text: error instanceof Error ? error.message : "Failed to migrate credentials"
+      };
+    } finally {
+      isMigrating = false;
+    }
+  }
+
+  function dismissMigration() {
+    hasEnvFile = false;
+  }
+
 </script>
 
 <div class="p-8 max-w-4xl mx-auto">
@@ -187,6 +239,47 @@
           <span>{saveMessage.text}</span>
         </div>
       </div>
+    {/if}
+
+    <!-- Migration Prompt -->
+    {#if hasEnvFile && !migrationComplete}
+      <Card class="p-6 mb-6 bg-blue-50 border-blue-200">
+        <div class="flex items-start gap-4">
+          <div class="flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div class="flex-1">
+            <h3 class="text-lg font-semibold text-blue-900 mb-2">Migrate Your API Keys</h3>
+            <p class="text-sm text-blue-700 mb-4">
+              We found API keys in your .env file. Would you like to migrate them to secure keychain storage?
+              This is recommended for better security.
+            </p>
+            <div class="flex gap-3">
+              <Button
+                variant="primary"
+                onclick={handleMigrateFromEnv}
+                disabled={isMigrating}
+                class="bg-blue-600 hover:bg-blue-700"
+              >
+                {#if isMigrating}
+                  <svg class="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Migrating...
+                {:else}
+                  Migrate to Keychain
+                {/if}
+              </Button>
+              <Button variant="secondary" onclick={dismissMigration}>
+                Keep Using .env
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
     {/if}
 
     <!-- Orchestrator Section -->

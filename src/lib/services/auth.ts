@@ -60,6 +60,21 @@ export async function refreshCredential(provider: string): Promise<Credential | 
 }
 
 /**
+ * Check if .env file exists and has credentials to migrate
+ */
+export async function checkEnvFileForMigration(envPath?: string): Promise<boolean> {
+  return await invoke<boolean>('check_env_file_for_migration', { envPath });
+}
+
+/**
+ * Migrate credentials from .env file to keychain storage
+ * Returns list of provider names that were migrated
+ */
+export async function migrateFromEnvFile(envPath?: string): Promise<string[]> {
+  return await invoke<string[]>('migrate_from_env_file', { envPath });
+}
+
+/**
  * Create an API key credential
  */
 export function createApiKeyCredential(provider: string, key: string): Credential {
