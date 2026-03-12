@@ -1,6 +1,7 @@
 use crate::models::config::SidecarConfig;
 use crate::models::message::{SidecarRequest, SidecarResponse};
 use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::process::{Child, Command};
 use std::sync::Arc;
 use std::time::Duration;
@@ -11,6 +12,7 @@ pub struct SidecarManager {
     config: SidecarConfig,
     process: Arc<Mutex<Option<Child>>>,
     restart_count: Arc<Mutex<u32>>,
+    credential_manager: Option<Arc<Mutex<Option<super::CredentialManager>>>>,
 }
 
 impl SidecarManager {
@@ -19,6 +21,19 @@ impl SidecarManager {
             config,
             process: Arc::new(Mutex::new(None)),
             restart_count: Arc::new(Mutex::new(0)),
+            credential_manager: None,
+        }
+    }
+
+    pub fn with_credentials(
+        config: SidecarConfig,
+        credential_manager: Arc<Mutex<Option<super::CredentialManager>>>,
+    ) -> Self {
+        Self {
+            config,
+            process: Arc::new(Mutex::new(None)),
+            restart_count: Arc::new(Mutex::new(0)),
+            credential_manager: Some(credential_manager),
         }
     }
 
@@ -29,16 +44,39 @@ impl SidecarManager {
             return Ok(()); // Already running
         }
 
+        // Fetch credentials from credential manager if available
+        let credential_envs = if let Some(cred_manager) = &self.credential_manager {
+            let manager_lock = cred_manager.lock().await;
+            if let Some(manager) = manager_lock.as_ref() {
+                manager
+                    .get_credentials_as_env()
+                    .await
+                    .unwrap_or_default()
+            } else {
+                HashMap::new()
+            }
+        } else {
+            HashMap::new()
+        };
+
         #[cfg(target_os = "windows")]
         let executable = format!("{}.exe", sidecar_path);
         #[cfg(not(target_os = "windows"))]
         let executable = sidecar_path.to_string();
 
-        let child = Command::new(&executable)
-            .arg("--host")
+        let mut cmd = Command::new(&executable);
+        cmd.arg("--host")
             .arg(&self.config.host)
             .arg("--port")
-            .arg(self.config.port.to_string())
+            .arg(self.config.port.to_string());
+
+        // Inject credentials as environment variables
+        for (key, value) in &credential_envs {
+            tracing::debug!("Injecting credential env: {}", key);
+            cmd.env(key, value);
+        }
+
+        let child = cmd
             .spawn()
             .context("Failed to start Python sidecar")?;
 

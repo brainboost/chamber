@@ -47,3 +47,48 @@ export interface SidecarConfig {
   health_check_interval_seconds: number;
   max_restart_attempts: number;
 }
+
+// Authentication types
+export type AuthType = "api_key" | "oauth_token";
+
+export interface Credential {
+  provider: string;
+  auth_type: AuthType;
+  // For API Key type
+  key?: string;
+  // For OAuth Token type
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: number;
+  scopes?: string[];
+}
+
+export interface ApiKeyCredential extends Credential {
+  auth_type: "api_key";
+  key: string;
+}
+
+export interface OAuthTokenCredential extends Credential {
+  auth_type: "oauth_token";
+  access_token: string;
+  refresh_token: string;
+  expires_at?: number;
+  scopes: string[];
+}
+
+export interface OAuthConfig {
+  provider: string;
+  auth_url: string;
+  token_url: string;
+  scopes: string[];
+  client_id?: string;
+  redirect_uri: string;
+}
+
+export interface ProviderAuthStatus {
+  provider: string;
+  has_credential: boolean;
+  auth_type?: AuthType;
+  // For OAuth, whether the token needs refresh
+  needs_refresh?: boolean;
+}

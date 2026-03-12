@@ -16,7 +16,11 @@ __all__ = [
 
 
 def get_provider(
-    provider_name: str, model: str, temperature: float = 0.7, max_tokens: int | None = None
+    provider_name: str,
+    model: str,
+    temperature: float = 0.7,
+    max_tokens: int | None = None,
+    api_key: str | None = None,
 ) -> BaseLLMProvider:
     """Get provider instance by name.
 
@@ -25,6 +29,7 @@ def get_provider(
         model: Model identifier
         temperature: Sampling temperature
         max_tokens: Maximum tokens to generate
+        api_key: Optional API key (injected from Rust backend)
 
     Returns:
         BaseLLMProvider instance
@@ -43,4 +48,4 @@ def get_provider(
     if not provider_class:
         raise ValueError(f"Unknown provider: {provider_name}")
 
-    return provider_class(model, temperature, max_tokens)
+    return provider_class(model, temperature, max_tokens, api_key)

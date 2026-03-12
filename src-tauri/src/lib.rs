@@ -9,6 +9,7 @@ pub use commands::config;
 pub use commands::workspace;
 pub use commands::sidecar;
 pub use commands::session as session_commands;
+pub use commands::auth as auth_commands;
 
 pub use logging::*;
 pub use models::config as config_types;

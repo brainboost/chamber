@@ -2,8 +2,9 @@
 
 use chamber::commands::config::AppState;
 use chamber::commands::sidecar::SidecarState;
+use chamber::commands::auth::AuthState;
 use chamber::logging::{init_default_logging, setup_logging, LoggingConfig};
-use chamber::services::SidecarManager;
+use chamber::services::{SidecarManager, CredentialManager};
 use chamber::utils::get_default_workspace_path;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -30,10 +31,17 @@ fn main() {
         sidecar_path: "chamber-sidecar".to_string(), // Will be resolved from bundle
     };
 
+    // Initialize auth state
+    let auth_state = AuthState {
+        credential_manager: Arc::new(TokioMutex::new(Some(CredentialManager::new()))),
+        pending_oauth_flows: Arc::new(TokioMutex::new(std::collections::HashMap::new())),
+    };
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(app_state)
         .manage(sidecar_state)
+        .manage(auth_state)
         .invoke_handler(tauri::generate_handler![
             // Config commands
             chamber::commands::config::load_config,
@@ -57,6 +65,15 @@ fn main() {
             chamber::commands::session::send_message,
             chamber::commands::session::pause_session,
             chamber::commands::session::resume_session,
+            // Auth commands
+            chamber::commands::auth::start_oauth_flow,
+            chamber::commands::auth::handle_oauth_callback,
+            chamber::commands::auth::save_credential,
+            chamber::commands::auth::get_credential,
+            chamber::commands::auth::delete_credential,
+            chamber::commands::auth::list_credentials,
+            chamber::commands::auth::has_credential,
+            chamber::commands::auth::refresh_credential,
         ])
         .setup(|app| {
             tracing::debug!("Setting up application");
@@ -69,7 +86,9 @@ fn main() {
                 max_restart_attempts: 3,
             };
 
-            let sidecar_manager = SidecarManager::new(config);
+            let auth_state_for_sidecar = app.state::<AuthState>();
+            let credential_manager_for_sidecar = auth_state_for_sidecar.credential_manager.clone();
+            let sidecar_manager = SidecarManager::with_credentials(config, credential_manager_for_sidecar);
             let sidecar_state = app.state::<SidecarState>();
 
             tauri::async_runtime::block_on(async {
@@ -93,6 +112,34 @@ fn main() {
                         }
                         Err(e) => {
                             tracing::warn!("Failed to start sidecar: {}. You may need to start it manually.", e);
+                        }
+                    }
+                }
+            });
+
+            // Start background OAuth token refresh task
+            let auth_state_for_refresh = app.state::<AuthState>();
+            tauri::async_runtime::spawn(async move {
+                // Check every 5 minutes for tokens that need refresh
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(300));
+                loop {
+                    interval.tick().await;
+
+                    let manager_lock = auth_state_for_refresh.credential_manager.lock().await;
+                    if let Some(manager) = manager_lock.as_ref() {
+                        // Check anthropic
+                        if let Err(e) = manager.refresh_token_if_needed("anthropic").await {
+                            tracing::warn!("Failed to refresh anthropic token: {}", e);
+                        }
+
+                        // Check gemini
+                        if let Err(e) = manager.refresh_token_if_needed("gemini").await {
+                            tracing::warn!("Failed to refresh gemini token: {}", e);
+                        }
+
+                        // Check xai
+                        if let Err(e) = manager.refresh_token_if_needed("xai").await {
+                            tracing::warn!("Failed to refresh xai token: {}", e);
                         }
                     }
                 }
