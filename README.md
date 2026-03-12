@@ -177,6 +177,16 @@ If using API keys instead of OAuth:
 - Check that your system keychain is accessible
 - Verify your account is still active with the provider
 
+## Platform Compatibility
+
+Chamber's keychain storage is compatible with:
+
+- **Windows 10/11**: Uses Windows Credential Manager
+- **macOS 12+**: Uses Keychain Access
+- **Linux**: Uses libsecret (gnome-keyring/kwallet)
+
+For detailed platform-specific testing and verification procedures, see [CROSS_PLATFORM_KEYRING.md](CROSS_PLATFORM_KEYRING.md).
+
 ### Running the Application
 
 Run the application in development mode:
