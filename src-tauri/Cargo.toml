@@ -35,6 +35,10 @@ url = "2.5"
 [dev-dependencies]
 tempfile = "3"
 
+[[test]]
+name = "integration"
+path = "tests/oauth_integration.rs"
+
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-shell = "2.0"
 
