@@ -45,6 +45,8 @@ impl SidecarManager {
         }
 
         // Fetch credentials from credential manager if available
+        // These are read from secure keychain storage and injected as environment variables
+        // The Python sidecar then reads them via os.getenv() for provider initialization
         let credential_envs = if let Some(cred_manager) = &self.credential_manager {
             let manager_lock = cred_manager.lock().await;
             if let Some(manager) = manager_lock.as_ref() {
@@ -71,6 +73,7 @@ impl SidecarManager {
             .arg(self.config.port.to_string());
 
         // Inject credentials as environment variables
+        // Python providers will read these via os.getenv() during initialization
         for (key, value) in &credential_envs {
             tracing::debug!("Injecting credential env: {}", key);
             cmd.env(key, value);
