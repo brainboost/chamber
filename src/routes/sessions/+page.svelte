@@ -82,8 +82,8 @@
   <!-- Header -->
   <div class="flex items-center justify-between mb-8">
     <div>
-      <h1 class="text-4xl font-bold text-gray-900 mb-2">Sessions</h1>
-      <p class="text-gray-600">View and manage your chamber sessions</p>
+      <h1 class="text-4xl font-bold text-gray-900 dark:text-slate-100 mb-2">Sessions</h1>
+      <p class="text-gray-600 dark:text-slate-400">View and manage your chamber sessions</p>
     </div>
     <Button variant="primary" onclick={handleNewSession}>
       <svg
@@ -136,10 +136,10 @@
             d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
           />
         </svg>
-        <p class="text-lg font-medium mb-2">
+        <p class="text-lg font-medium dark:text-slate-200 mb-2">
           {searchQuery ? "No sessions found" : "No sessions yet"}
         </p>
-        <p class="text-sm mb-4">
+        <p class="text-sm dark:text-slate-400 mb-4">
           {searchQuery
             ? "Try a different search query"
             : "Create your first chamber session to get started"}
@@ -177,14 +177,14 @@
                 </svg>
               </div>
               <div class="flex-1 min-w-0">
-                <h3 class="font-semibold text-gray-900 truncate">
+                <h3 class="font-semibold text-gray-900 dark:text-slate-100 truncate">
                   {session.title}
                 </h3>
                 <div class="flex items-center gap-4 mt-1">
-                  <p class="text-sm text-gray-600">
+                  <p class="text-sm text-gray-600 dark:text-slate-400">
                     Created: {formatDate(session.created_at)}
                   </p>
-                  <p class="text-sm text-gray-600">
+                  <p class="text-sm text-gray-600 dark:text-slate-400">
                     Updated: {formatDate(session.updated_at)}
                   </p>
                 </div>
@@ -195,13 +195,13 @@
                 <div
                   class="w-2 h-2 {getStatusColor(session.status)} rounded-full"
                 ></div>
-                <span class="text-sm text-gray-600 capitalize"
+                <span class="text-sm text-gray-600 dark:text-slate-400 capitalize"
                   >{session.status}</span
                 >
               </div>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5 text-gray-400"
+                class="h-5 w-5 text-gray-400 dark:text-slate-500"
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
