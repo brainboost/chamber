@@ -77,8 +77,8 @@
 <div class="p-8 max-w-7xl mx-auto">
   <!-- Header -->
   <div class="mb-8">
-    <h1 class="text-4xl font-bold text-gray-900 mb-2">Dashboard</h1>
-    <p class="text-gray-600">
+    <h1 class="text-4xl font-bold text-gray-900 dark:text-slate-100 mb-2">Dashboard</h1>
+    <p class="text-gray-600 dark:text-slate-400">
       Multi-Model AI Application with Human-in-the-Loop Workflows
     </p>
   </div>
@@ -109,8 +109,8 @@
           </svg>
         </div>
         <div class="flex-1">
-          <h3 class="font-semibold text-gray-900 mb-1">New Session</h3>
-          <p class="text-sm text-gray-600">Start a new multi-model chamber</p>
+          <h3 class="font-semibold text-gray-900 dark:text-slate-100 mb-1">New Session</h3>
+          <p class="text-sm text-gray-600 dark:text-slate-400">Start a new multi-model chamber</p>
         </div>
       </div>
     </Card>
@@ -139,8 +139,8 @@
           </svg>
         </div>
         <div class="flex-1">
-          <h3 class="font-semibold text-gray-900 mb-1">Browse Sessions</h3>
-          <p class="text-sm text-gray-600">View all chamber sessions</p>
+          <h3 class="font-semibold text-gray-900 dark:text-slate-100 mb-1">Browse Sessions</h3>
+          <p class="text-sm text-gray-600 dark:text-slate-400">View all chamber sessions</p>
         </div>
       </div>
     </Card>
@@ -169,8 +169,8 @@
           </svg>
         </div>
         <div class="flex-1">
-          <h3 class="font-semibold text-gray-900 mb-1">Settings</h3>
-          <p class="text-sm text-gray-600">Configure models and tools</p>
+          <h3 class="font-semibold text-gray-900 dark:text-slate-100 mb-1">Settings</h3>
+          <p class="text-sm text-gray-600 dark:text-slate-400">Configure models and tools</p>
         </div>
       </div>
     </Card>
@@ -178,7 +178,7 @@
 
   <!-- Recent Sessions -->
   <div>
-    <h2 class="text-2xl font-bold text-gray-900 mb-4">Recent Sessions</h2>
+    <h2 class="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-4">Recent Sessions</h2>
 
     {#if isLoading}
       <div class="flex items-center justify-center h-40">
@@ -203,8 +203,8 @@
               d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
             />
           </svg>
-          <p class="text-lg font-medium mb-2">No sessions yet</p>
-          <p class="text-sm mb-4">
+          <p class="text-lg font-medium mb-2 dark:text-slate-200">No sessions yet</p>
+          <p class="text-sm mb-4 dark:text-slate-400">
             Create your first chamber session to get started
           </p>
           <Button variant="primary" onclick={handleNewSession}>
@@ -238,8 +238,8 @@
                   </svg>
                 </div>
                 <div>
-                  <h3 class="font-semibold text-gray-900">{session.title}</h3>
-                  <p class="text-sm text-gray-600">
+                  <h3 class="font-semibold text-gray-900 dark:text-slate-100">{session.title}</h3>
+                  <p class="text-sm text-gray-600 dark:text-slate-400">
                     {formatDate(session.updated_at)}
                   </p>
                 </div>
@@ -251,13 +251,13 @@
                       session.status,
                     )} rounded-full"
                   ></div>
-                  <span class="text-sm text-gray-600 capitalize"
+                  <span class="text-sm text-gray-600 dark:text-slate-400 capitalize"
                     >{session.status}</span
                   >
                 </div>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5 text-gray-400"
+                  class="h-5 w-5 text-gray-400 dark:text-slate-500"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >

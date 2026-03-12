@@ -16,7 +16,7 @@
   });
 </script>
 
-<div class="flex flex-col h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+<div class="flex flex-col h-screen bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-slate-100">
   <Header />
 
   <div class="flex flex-1 overflow-hidden">

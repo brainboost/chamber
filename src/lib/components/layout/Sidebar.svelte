@@ -34,14 +34,14 @@
   }
 </script>
 
-<aside class="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
+<aside class="w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 flex flex-col h-full">
   <nav class="flex-1 px-4 py-6 space-y-2">
     {#each navItems as item}
       <a
         href={item.path}
         class="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors {isActive(item.path)
-          ? 'bg-blue-50 text-blue-700 font-medium'
-          : 'text-gray-700 hover:bg-gray-50'}"
+          ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 font-medium'
+          : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700/50'}"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -59,7 +59,7 @@
   </nav>
 
   <!-- Footer -->
-  <div class="px-4 py-4 border-t border-gray-200">
+  <div class="px-4 py-4 border-t border-gray-200 dark:border-slate-700">
     <div class="text-xs text-gray-500 text-center">
       <p>Chamber v0.1.0</p>
       <p class="mt-1">Multi-Model AI</p>
