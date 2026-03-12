@@ -116,19 +116,21 @@
 
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2"
+          <label for="orchestrator-provider" class="block text-sm font-medium text-gray-700 mb-2"
             >Provider</label
           >
           <Input
+            id="orchestrator-provider"
             bind:value={localConfig.orchestrator.provider}
             placeholder="e.g., anthropic, google, ollama"
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2"
+          <label for="orchestrator-model" class="block text-sm font-medium text-gray-700 mb-2"
             >Model</label
           >
           <Input
+            id="orchestrator-model"
             bind:value={localConfig.orchestrator.model}
             placeholder="e.g., claude-3-5-sonnet-20241022"
           />
@@ -148,8 +150,9 @@
           <div class="border-l-4 border-blue-500 pl-4">
             <div class="flex items-center justify-between mb-3">
               <h3 class="font-semibold text-gray-900">Model {i + 1}</h3>
-              <label class="flex items-center gap-2 cursor-pointer">
+              <label for="model-enabled-{i}" class="flex items-center gap-2 cursor-pointer">
                 <input
+                  id="model-enabled-{i}"
                   type="checkbox"
                   bind:checked={model.enabled}
                   class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
@@ -159,16 +162,16 @@
             </div>
             <div class="space-y-3">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1"
+                <label for="reasoning-provider-{i}" class="block text-sm font-medium text-gray-700 mb-1"
                   >Provider</label
                 >
-                <Input bind:value={model.provider} />
+                <Input id="reasoning-provider-{i}" bind:value={model.provider} />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1"
+                <label for="reasoning-model-{i}" class="block text-sm font-medium text-gray-700 mb-1"
                   >Model</label
                 >
-                <Input bind:value={model.model} />
+                <Input id="reasoning-model-{i}" bind:value={model.model} />
               </div>
             </div>
           </div>
@@ -185,28 +188,31 @@
 
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2"
+          <label for="workspace-path" class="block text-sm font-medium text-gray-700 mb-2"
             >Workspace Path</label
           >
           <Input
+            id="workspace-path"
             bind:value={localConfig.workspace.path}
             placeholder="./workspace"
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2"
+          <label for="sessions-dir" class="block text-sm font-medium text-gray-700 mb-2"
             >Sessions Directory</label
           >
           <Input
+            id="sessions-dir"
             bind:value={localConfig.workspace.sessions_dir}
             placeholder="sessions"
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2"
+          <label for="config-dir" class="block text-sm font-medium text-gray-700 mb-2"
             >Config Directory</label
           >
           <Input
+            id="config-dir"
             bind:value={localConfig.workspace.config_dir}
             placeholder=".config"
           />
@@ -221,8 +227,9 @@
         Configure which tools require human approval before execution.
       </p>
 
-      <label class="flex items-center gap-2 cursor-pointer">
+      <label for="tools-approval" class="flex items-center gap-2 cursor-pointer">
         <input
+          id="tools-approval"
           type="checkbox"
           bind:checked={localConfig.tools.approval_required}
           class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"

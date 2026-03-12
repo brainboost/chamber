@@ -1,7 +1,7 @@
 use crate::commands::config::AppState;
 use crate::commands::sidecar::SidecarState;
 use crate::models::message::{Message, SidecarRequest};
-use crate::models::session::{Session, SessionStatus};
+use crate::models::session::Session;
 use crate::services::WorkspaceManager;
 use tauri::State;
 
@@ -31,6 +31,8 @@ pub async fn send_message(
     content: String,
     sidecar_state: State<'_, SidecarState>,
 ) -> Result<(), String> {
+    tracing::info!("Sending message to session: {}", session_id);
+
     let manager_lock = sidecar_state.manager.lock().await;
 
     if let Some(manager) = manager_lock.as_ref() {
@@ -39,18 +41,25 @@ pub async fn send_message(
             message: Message::UserMessage { content },
         };
 
-        let response = manager
-            .send_message(request)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        if !response.success {
-            return Err(response.error.unwrap_or_else(|| "Unknown error".to_string()));
+        match manager.send_message(request).await {
+            Ok(response) => {
+                if !response.success {
+                    let error_msg = response.error.unwrap_or_else(|| "Unknown error".to_string());
+                    tracing::error!("Sidecar returned error: {}", error_msg);
+                    return Err(error_msg);
+                }
+                tracing::info!("Message sent successfully");
+                Ok(())
+            }
+            Err(e) => {
+                tracing::error!("Failed to send message to sidecar: {}", e);
+                Err(e.to_string())
+            }
         }
-
-        Ok(())
     } else {
-        Err("Sidecar manager not initialized".to_string())
+        let error_msg = "Sidecar manager not initialized. Please start the sidecar first.";
+        tracing::error!("{}", error_msg);
+        Err(error_msg.to_string())
     }
 }
 

@@ -3,6 +3,7 @@ use tauri::State;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+#[derive(Clone)]
 pub struct SidecarState {
     pub manager: Arc<Mutex<Option<SidecarManager>>>,
     pub sidecar_path: String,

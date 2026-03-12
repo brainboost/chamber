@@ -1,14 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use chamber::commands::config::{get_config, load_config, save_config, AppState};
-use chamber::commands::session::{create_session, pause_session, resume_session, send_message};
-use chamber::commands::sidecar::{
-    get_websocket_url, health_check_sidecar, is_sidecar_running, restart_sidecar, start_sidecar,
-    stop_sidecar, SidecarState,
-};
-use chamber::commands::workspace::{
-    append_to_history, init_workspace, list_sessions, load_session_history, save_plan,
-};
+use chamber::commands::config::AppState;
+use chamber::commands::sidecar::SidecarState;
 use chamber::logging::{init_default_logging, setup_logging, LoggingConfig};
 use chamber::services::SidecarManager;
 use chamber::utils::get_default_workspace_path;
@@ -85,6 +78,26 @@ fn main() {
                 tracing::info!("Sidecar manager initialized");
             });
 
+            // Auto-start the sidecar in a separate async block
+            let sidecar_manager_arc = sidecar_state.manager.clone();
+            tauri::async_runtime::spawn(async move {
+                // Small delay to ensure app is fully initialized
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+                let manager_lock = sidecar_manager_arc.lock().await;
+                if let Some(manager) = manager_lock.as_ref() {
+                    tracing::info!("Attempting to start sidecar...");
+                    match manager.start("chamber-sidecar").await {
+                        Ok(_) => {
+                            tracing::info!("Sidecar started successfully");
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to start sidecar: {}. You may need to start it manually.", e);
+                        }
+                    }
+                }
+            });
+
             // Initialize workspace
             let workspace_path = get_default_workspace_path();
             let workspace_manager = chamber::services::WorkspaceManager::new(&workspace_path);
@@ -95,7 +108,7 @@ fn main() {
             }
 
             // Load and apply logging configuration
-            if let Ok(config) = load_config_from_workspace(&workspace_path) {
+            if let Ok(config) = load_config_from_workspace(std::path::Path::new(&workspace_path)) {
                 if let Some(logging_config) = config.get("logging") {
                     if let Ok(log_config) = serde_yaml::from_value::<LoggingConfig>(logging_config.clone()) {
                         tracing::info!("Applying logging configuration from workspace");

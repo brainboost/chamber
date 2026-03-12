@@ -59,7 +59,7 @@
       console.error('Failed to send message:', error);
       const errorMessage: Message = {
         type: 'Error',
-        message: error instanceof Error ? error.message : 'Failed to send message',
+        message: error instanceof Error ? error.message : String(error),
       };
       messages = [...messages, errorMessage];
     } finally {

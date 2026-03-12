@@ -4,7 +4,14 @@ pub mod models;
 pub mod services;
 pub mod utils;
 
-pub use commands::*;
+// Re-exports with explicit namespaces to avoid conflicts
+pub use commands::config;
+pub use commands::workspace;
+pub use commands::sidecar;
+pub use commands::session as session_commands;
+
 pub use logging::*;
-pub use models::*;
+pub use models::config as config_types;
+pub use models::session;
+pub use models::message;
 pub use services::*;

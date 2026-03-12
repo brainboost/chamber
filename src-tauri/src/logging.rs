@@ -9,7 +9,7 @@ use tracing::Level;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{
     fmt::{self, format::FmtSpan},
-    layer::SubscriberExt,
+    layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
     EnvFilter, Registry,
 };
@@ -38,7 +38,7 @@ pub struct ConsoleConfig {
     #[serde(default = "default_console_enabled")]
     pub enabled: bool,
 
-    /// Format: colored, text, json
+    /// Format: colored, text
     #[serde(default = "default_console_format")]
     pub format: String,
 }
@@ -61,7 +61,7 @@ pub struct FileConfig {
     #[serde(default = "default_file_backup_count")]
     pub backup_count: usize,
 
-    /// Format: text, json
+    /// Format: text
     #[serde(default = "default_file_format")]
     pub format: String,
 }
@@ -160,15 +160,88 @@ pub fn setup_logging(config: &LoggingConfig) -> Result<()> {
 
     let env_filter = create_env_filter(config, log_level);
 
-    let console_layer = create_console_layer(config)?;
-    let file_layer = create_file_layer(config)?;
+    // Check what's enabled
+    let console_enabled = config
+        .console
+        .as_ref()
+        .map(|c| c.enabled)
+        .unwrap_or(true);
 
-    let subscriber = Registry::default()
-        .with(env_filter)
-        .with(console_layer)
-        .with(file_layer);
+    let file_enabled = config
+        .file
+        .as_ref()
+        .map(|c| c.enabled)
+        .unwrap_or(false);
 
-    subscriber.init();
+    // Simple approach: build layers based on what's enabled
+    if console_enabled {
+        if file_enabled {
+            // Both enabled - use the multi-layer approach
+            let log_dir = get_log_dir()?;
+            let file_appender = RollingFileAppender::new(Rotation::DAILY, log_dir, "chamber.log");
+            let (non_blocking, file_guard) = tracing_appender::non_blocking(file_appender);
+
+            // Build subscriber with both layers
+            let subscriber = Registry::default()
+                .with(env_filter)
+                .with(
+                    fmt::layer()
+                        .with_file(true)
+                        .with_line_number(true)
+                        .with_span_events(FmtSpan::CLOSE),
+                )
+                .with(
+                    fmt::layer()
+                        .with_writer(non_blocking)
+                        .with_file(true)
+                        .with_line_number(true)
+                        .with_span_events(FmtSpan::CLOSE)
+                        .boxed(),
+                );
+
+            subscriber.init();
+
+            // Leak the guard to keep it alive for the program duration
+            Box::leak(Box::new(file_guard));
+        } else {
+            // Only console
+            let subscriber = Registry::default()
+                .with(env_filter)
+                .with(
+                    fmt::layer()
+                        .with_file(true)
+                        .with_line_number(true)
+                        .with_span_events(FmtSpan::CLOSE),
+                );
+
+            subscriber.init();
+        }
+    } else if file_enabled {
+        // Only file
+        let log_dir = get_log_dir()?;
+        let file_appender = RollingFileAppender::new(Rotation::DAILY, log_dir, "chamber.log");
+        let (non_blocking, file_guard) = tracing_appender::non_blocking(file_appender);
+
+        let subscriber = Registry::default()
+            .with(env_filter)
+            .with(
+                fmt::layer()
+                    .with_writer(non_blocking)
+                    .with_file(true)
+                    .with_line_number(true)
+                    .with_span_events(FmtSpan::CLOSE)
+                    .boxed(),
+            );
+
+        subscriber.init();
+
+        // Leak the guard to keep it alive
+        Box::leak(Box::new(file_guard));
+    } else {
+        // Neither - just the filter
+        let subscriber = Registry::default().with(env_filter);
+        subscriber.init();
+    }
 
     Ok(())
 }
@@ -178,39 +251,38 @@ fn create_env_filter(config: &LoggingConfig, default_level: Level) -> EnvFilter 
     let mut filter = EnvFilter::new(format!("chamber={}", default_level));
 
     // Add component-specific filters
-    if let Some(ref components) = config.components {
-        if let Some(ref sidecar_level) = components.sidecar {
-            filter = filter.add_directive("chamber_sidecar".parse().unwrap());
-            filter = filter.add_directive(
-                format!("chamber_sidecar={}", sidecar_level)
-                    .parse()
-                    .unwrap(),
-            );
-        }
-        if let Some(ref tauri_level) = components.tauri {
-            filter = filter.add_directive(
-                format!("chamber_tauri={}", tauri_level)
-                    .parse()
-                    .unwrap(),
-            );
-        }
-        if let Some(ref llm_level) = components.llm {
-            filter = filter.add_directive(format!("chamber_llm={}", llm_level).parse().unwrap());
-        }
-        if let Some(ref tools_level) = components.tools {
-            filter = filter.add_directive(
-                format!("chamber_tools={}", tools_level)
-                    .parse()
-                    .unwrap(),
-            );
-        }
-        if let Some(ref websocket_level) = components.websocket {
-            filter = filter.add_directive(
-                format!("chamber_websocket={}", websocket_level)
-                    .parse()
-                    .unwrap(),
-            );
-        }
+    let components = &config.components;
+    if let Some(ref sidecar_level) = components.sidecar {
+        filter = filter.add_directive(
+            format!("chamber_sidecar={}", sidecar_level)
+                .parse()
+                .unwrap(),
+        );
+    }
+    if let Some(ref tauri_level) = components.tauri {
+        filter = filter.add_directive(
+            format!("chamber_tauri={}", tauri_level)
+                .parse()
+                .unwrap(),
+        );
+    }
+    if let Some(ref llm_level) = components.llm {
+        filter = filter
+            .add_directive(format!("chamber_llm={}", llm_level).parse().unwrap());
+    }
+    if let Some(ref tools_level) = components.tools {
+        filter = filter.add_directive(
+            format!("chamber_tools={}", tools_level)
+                .parse()
+                .unwrap(),
+        );
+    }
+    if let Some(ref websocket_level) = components.websocket {
+        filter = filter.add_directive(
+            format!("chamber_websocket={}", websocket_level)
+                .parse()
+                .unwrap(),
+        );
     }
 
     // Always include important crates
@@ -221,97 +293,6 @@ fn create_env_filter(config: &LoggingConfig, default_level: Level) -> EnvFilter 
         .add_directive("reqwest=warn".parse().unwrap());
 
     filter
-}
-
-/// Create console logging layer
-fn create_console_layer(config: &LoggingConfig) -> Result<Option<fmt::Layer<Registry>>> {
-    let console_config = config.console.as_ref();
-
-    let enabled = console_config
-        .map(|c| c.enabled)
-        .unwrap_or(true);
-
-    if !enabled {
-        return Ok(None);
-    }
-
-    let format = console_config
-        .map(|c| c.format.as_str())
-        .unwrap_or("colored");
-
-    let layer = match format {
-        "json" => fmt::layer()
-            .json()
-            .with_file(true)
-            .with_line_number(true)
-            .with_span_events(FmtSpan::CLOSE)
-            .boxed(),
-        "text" => fmt::layer()
-            .with_file(true)
-            .with_line_number(true)
-            .with_span_events(FmtSpan::CLOSE)
-            .boxed(),
-        _ => fmt::layer()
-            .with_file(true)
-            .with_line_number(true)
-            .with_span_events(FmtSpan::CLOSE)
-            .boxed(), // colored is default
-    };
-
-    Ok(Some(layer))
-}
-
-/// Create file logging layer
-fn create_file_layer(config: &LoggingConfig) -> Result<Option<tracing_appender::non_blocking::WorkerGuard>> {
-    let file_config = config.file.as_ref();
-
-    let enabled = file_config
-        .map(|c| c.enabled)
-        .unwrap_or(false);
-
-    if !enabled {
-        return Ok(None);
-    }
-
-    let log_dir = get_log_dir()?;
-    let file_appender = RollingFileAppender::new(
-        Rotation::DAILY,
-        log_dir,
-        "chamber.log",
-    );
-
-    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
-
-    let format = file_config
-        .map(|c| c.format.as_str())
-        .unwrap_or("text");
-
-    let layer = match format {
-        "json" => fmt::layer()
-            .json()
-            .with_writer(non_blocking)
-            .with_file(true)
-            .with_line_number(true)
-            .with_span_events(FmtSpan::CLOSE)
-            .boxed(),
-        _ => fmt::layer()
-            .with_writer(non_blocking)
-            .with_file(true)
-            .with_line_number(true)
-            .with_span_events(FmtSpan::CLOSE)
-            .boxed(),
-    };
-
-    // Note: The layer needs to be added to the subscriber, but we can't return it directly
-    // because of lifetime issues. Instead, we return the guard and let the caller handle it.
-    // For now, we'll just init the file layer here.
-
-    tracing::subscriber::with_default(
-        Registry::default().with(layer),
-        || {},
-    );
-
-    Ok(Some(guard))
 }
 
 /// Initialize logging with default settings
