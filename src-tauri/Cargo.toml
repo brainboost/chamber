@@ -26,9 +26,19 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-appender = "0.2"
 tracing-log = "0.2"
 directories = "6.0.0"
+keyring = { version = "3", features = ["windows-native", "apple-native", "linux-native-sync-persistent"] }
+base64 = "0.22"
+sha2 = "0.10"
+rand = "0.8"
+url = "2.5"
+open = "5"
 
 [dev-dependencies]
 tempfile = "3"
+
+[[test]]
+name = "integration"
+path = "tests/oauth_integration.rs"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-shell = "2.0"

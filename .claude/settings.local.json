@@ -13,7 +13,8 @@
       "Bash(uv run:*)",
       "Bash(cd .. && npm run dev)",
       "Bash(npm run:*)",
-      "Bash(netstat -ano | grep :1420 || echo \"Nothing on port 1420\")"
+      "Bash(netstat -ano | grep :1420 || echo \"Nothing on port 1420\")",
+      "Bash(git stash:*)"
     ]
   }
 }

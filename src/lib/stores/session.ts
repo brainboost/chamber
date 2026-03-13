@@ -87,13 +87,15 @@ export const sessionStore = {
     }
   },
 
-  async sendMessage(sessionId: string, content: string): Promise<void> {
+  async sendMessage(sessionId: string, content: string): Promise<string | null> {
     try {
-      // Send message to sidecar via Tauri
-      await tauri.sendMessage(sessionId, content);
+      // Send message to sidecar via Tauri; returns AI response
+      const aiResponse = await tauri.sendMessage(sessionId, content);
 
       // Save to history file
       await tauri.appendToHistory(sessionId, `## User\n${content}`);
+
+      return aiResponse ?? null;
     } catch (error) {
       console.error('Failed to send message:', error);
       throw error;

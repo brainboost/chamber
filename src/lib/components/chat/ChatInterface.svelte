@@ -44,9 +44,20 @@
       };
       messages = [...messages, newMessage];
 
-      // Save to store and send to backend
+      // Save to store and send to backend; receive AI response
       await chatStore.addMessage(sessionId, newMessage);
-      await sessionStore.sendMessage(sessionId, userMessage);
+      const aiResponse = await sessionStore.sendMessage(sessionId, userMessage);
+
+      // Add AI response to UI if we got one
+      if (aiResponse) {
+        const assistantMessage: Message = {
+          type: 'AssistantMessage',
+          content: aiResponse,
+          model: 'chamber',
+        };
+        messages = [...messages, assistantMessage];
+        await chatStore.addMessage(sessionId, assistantMessage);
+      }
 
       // Scroll to bottom
       setTimeout(() => {

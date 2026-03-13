@@ -66,8 +66,8 @@ export async function createSession(title: string): Promise<Session> {
   return await invoke<Session>('create_session', { title });
 }
 
-export async function sendMessage(sessionId: string, content: string): Promise<void> {
-  return await invoke('send_message', { sessionId, content });
+export async function sendMessage(sessionId: string, content: string): Promise<string | null> {
+  return await invoke<string | null>('send_message', { sessionId, content });
 }
 
 export async function pauseSession(sessionId: string): Promise<void> {
