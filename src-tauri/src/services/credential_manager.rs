@@ -39,7 +39,7 @@ impl CredentialManager {
 
         // Update cache
         let mut cache = self.cache.write().await;
-        cache.insert(provider, credential);
+        cache.insert(provider.clone(), credential);
 
         tracing::info!("Stored credential for provider: {}", provider);
         Ok(())
@@ -89,15 +89,17 @@ impl CredentialManager {
         let entry = Entry::new(SERVICE_NAME, &format!("{}_credential", provider))
             .map_err(|e| anyhow!("Failed to create keyring entry: {}", e))?;
 
-        entry
-            .delete_credential()
-            .map_err(|e| match e {
-                KeyringError::NoEntry => {
-                    tracing::info!("No credential found to delete for provider: {}", provider);
-                    Ok(())
-                }
-                _ => Err(anyhow!("Failed to delete credential from keychain: {}", e)),
-            })?;
+        match entry.delete_credential() {
+            Ok(_) => {
+                tracing::info!("Deleted credential from keychain for provider: {}", provider);
+            }
+            Err(KeyringError::NoEntry) => {
+                tracing::info!("No credential found to delete for provider: {}", provider);
+            }
+            Err(e) => {
+                return Err(anyhow!("Failed to delete credential from keychain: {}", e));
+            }
+        }
 
         // Remove from cache
         let mut cache = self.cache.write().await;
@@ -109,15 +111,22 @@ impl CredentialManager {
 
     /// List all providers with stored credentials
     pub async fn list_providers(&self) -> Result<Vec<String>> {
-        let cache = self.cache.read().await;
-        let mut providers: Vec<String> = cache.keys().cloned().collect();
+        {
+            let cache = self.cache.read().await;
+            if !cache.is_empty() {
+                let mut providers: Vec<String> = cache.keys().cloned().collect();
+                providers.sort();
+                return Ok(providers);
+            }
+        }
 
-        // If cache is empty, try to discover from keychain
-        if providers.is_empty() {
-            drop(cache);
-            // Note: keyring crate doesn't provide a way to list all entries
-            // Users would need to know which providers they've set up
-            // This is a limitation we work with
+        // Cache is empty (fresh start) — check keyring for all known providers
+        let known_providers = ["anthropic", "gemini", "xai"];
+        let mut providers = Vec::new();
+        for provider in &known_providers {
+            if let Ok(Some(_)) = self.get_credential(provider).await {
+                providers.push(provider.to_string());
+            }
         }
 
         providers.sort();
@@ -133,12 +142,10 @@ impl CredentialManager {
                 tracing::info!("Token refresh needed for provider: {}", provider);
 
                 // Log token expiry info
-                if let AuthType::OAuthToken { expires_at, .. } = &credential.auth_type {
-                    if let Some(expiry) = expires_at {
-                        let now = chrono::Utc::now().timestamp();
-                        let minutes_until_expiry = (expiry - now) / 60;
-                        tracing::info!("Token expires in {} minutes", minutes_until_expiry);
-                    }
+                if let AuthType::OAuthToken { expires_at: Some(expiry), .. } = &credential.auth_type {
+                    let now = chrono::Utc::now().timestamp();
+                    let minutes_until_expiry = (expiry - now) / 60;
+                    tracing::info!("Token expires in {} minutes", minutes_until_expiry);
                 }
 
                 let refreshed = self.refresh_oauth_token(&credential).await?;
@@ -171,6 +178,9 @@ impl CredentialManager {
             }
             AuthType::ApiKey { .. } => {
                 return Err(anyhow!("Cannot refresh API key credential"));
+            }
+            AuthType::BearerToken { .. } => {
+                return Err(anyhow!("Cannot refresh bearer token credential"));
             }
         };
 
@@ -263,14 +273,30 @@ impl CredentialManager {
         code_challenge: &str,
         state: &str,
     ) -> Result<String> {
+        Self::get_authorization_url_with_redirect(provider, code_challenge, state, None)
+    }
+
+    /// Get OAuth authorization URL with a custom redirect URI
+    pub fn get_authorization_url_with_redirect(
+        provider: &str,
+        code_challenge: &str,
+        state: &str,
+        redirect_uri_override: Option<&str>,
+    ) -> Result<String> {
         tracing::debug!("Generating authorization URL for provider: {}", provider);
         tracing::trace!("Using state parameter: {}", state);
 
-        let config = OAuthConfig::for_provider(provider)
-            .ok_or_else(|| anyhow!("No OAuth config for provider: {}", provider))?;
+        let config = if let Some(redirect_uri) = redirect_uri_override {
+            OAuthConfig::for_provider_with_redirect(provider, redirect_uri.to_string())
+                .ok_or_else(|| anyhow!("No OAuth config for provider: {}", provider))?
+        } else {
+            OAuthConfig::for_provider(provider)
+                .ok_or_else(|| anyhow!("No OAuth config for provider: {}", provider))?
+        };
 
         tracing::debug!("OAuth config - auth_url: {}, token_url: {}",
             config.auth_url, config.token_url);
+        tracing::debug!("OAuth redirect_uri: {}", config.redirect_uri);
         tracing::debug!("OAuth scopes: {}", config.scopes.join(", "));
 
         let mut url = url::Url::parse(&config.auth_url)?;
@@ -306,11 +332,26 @@ impl CredentialManager {
         code: &str,
         code_verifier: &str,
     ) -> Result<Credential> {
+        Self::exchange_code_for_token_with_redirect(provider, code, code_verifier, None).await
+    }
+
+    /// Exchange authorization code for tokens with a custom redirect URI
+    pub async fn exchange_code_for_token_with_redirect(
+        provider: &str,
+        code: &str,
+        code_verifier: &str,
+        redirect_uri_override: Option<&str>,
+    ) -> Result<Credential> {
         tracing::info!("Exchanging authorization code for tokens for provider: {}", provider);
         tracing::debug!("Authorization code length: {}", code.len());
 
-        let config = OAuthConfig::for_provider(provider)
-            .ok_or_else(|| anyhow!("No OAuth config for provider: {}", provider))?;
+        let config = if let Some(redirect_uri) = redirect_uri_override {
+            OAuthConfig::for_provider_with_redirect(provider, redirect_uri.to_string())
+                .ok_or_else(|| anyhow!("No OAuth config for provider: {}", provider))?
+        } else {
+            OAuthConfig::for_provider(provider)
+                .ok_or_else(|| anyhow!("No OAuth config for provider: {}", provider))?
+        };
 
         tracing::debug!("Token endpoint: {}", config.token_url);
 
@@ -397,10 +438,19 @@ impl CredentialManager {
     pub async fn get_credentials_as_env(&self) -> Result<HashMap<String, String>> {
         let mut env_vars = HashMap::new();
 
-        // Anthropic
+        // Anthropic — API keys go to ANTHROPIC_API_KEY; OAuth/bearer tokens go to ANTHROPIC_OAUTH_TOKEN
         if let Some(cred) = self.get_credential("anthropic").await? {
             if let Some(token) = cred.get_token() {
-                env_vars.insert("ANTHROPIC_API_KEY".to_string(), token);
+                match &cred.auth_type {
+                    AuthType::ApiKey { .. } => {
+                        env_vars.insert("ANTHROPIC_API_KEY".to_string(), token);
+                    }
+                    AuthType::BearerToken { .. } | AuthType::OAuthToken { .. } => {
+                        // ANTHROPIC_AUTH_TOKEN is the env var the Anthropic SDK reads
+                        // for bearer/OAuth token authentication (Authorization: Bearer)
+                        env_vars.insert("ANTHROPIC_AUTH_TOKEN".to_string(), token);
+                    }
+                }
             }
         }
 
@@ -439,7 +489,6 @@ struct TokenResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::auth::AuthType;
 
     #[test]
     fn test_generate_pkce_verifier() {
@@ -478,17 +527,16 @@ mod tests {
         assert!(url.contains("state=test-state"));
         assert!(url.contains("response_type=code"));
         assert!(url.contains("code_challenge_method=S256"));
-        assert!(url.contains("redirect_uri=chamber://oauth/callback"));
+        assert!(url.contains("redirect_uri=chamber%3A%2F%2Foauth%2Fcallback"));
         assert!(url.contains("scope="));
     }
 
     #[test]
-    fn test_authorization_url_google_includes_client_id() {
+    fn test_authorization_url_google_no_oauth_config() {
+        // Gemini uses API keys only — no OAuth config registered
         let (_verifier, challenge) = CredentialManager::generate_pkce_verifier().unwrap();
-        let url = CredentialManager::get_authorization_url("gemini", &challenge, "test-state").unwrap();
-
-        assert!(url.contains("client_id="));
-        assert!(url.contains("https://accounts.google.com"));
+        let result = CredentialManager::get_authorization_url("gemini", &challenge, "test-state");
+        assert!(result.is_err());
     }
 
     #[test]
@@ -559,22 +607,19 @@ mod tests {
     fn test_oauth_config_anthropic() {
         let config = OAuthConfig::for_provider("anthropic").unwrap();
         assert_eq!(config.provider, "anthropic");
-        assert!(config.auth_url.contains("claude.ai"));
-        assert!(config.token_url.contains("claude.ai"));
-        assert!(config.scopes.contains(&"openid".to_string()));
-        assert!(config.scopes.contains(&"offline_access".to_string()));
+        assert!(config.auth_url.contains("claude.ai/oauth/authorize"));
+        assert!(config.token_url.contains("platform.claude.com"));
+        assert!(config.scopes.contains(&"user:inference".to_string()));
+        assert!(config.scopes.contains(&"user:profile".to_string()));
         assert_eq!(config.redirect_uri, "chamber://oauth/callback");
-        assert!(config.client_id.is_none()); // Anthropic doesn't use client_id
+        assert!(config.client_id.is_some()); // Always set: env var or default
     }
 
     #[test]
-    fn test_oauth_config_gemini() {
-        let config = OAuthConfig::for_provider("gemini").unwrap();
-        assert_eq!(config.provider, "gemini");
-        assert!(config.auth_url.contains("accounts.google.com"));
-        assert!(config.token_url.contains("oauth2.googleapis.com"));
-        assert!(config.scopes.contains(&"https://www.googleapis.com/auth/generative.language".to_string()));
-        assert!(config.client_id.is_some()); // Google requires client_id
+    fn test_oauth_config_gemini_not_available() {
+        // Gemini uses API keys only — no OAuth config
+        let config = OAuthConfig::for_provider("gemini");
+        assert!(config.is_none());
     }
 
     #[test]
@@ -629,10 +674,9 @@ mod tests {
     fn test_get_credentials_as_env_empty() {
         // This test verifies the function exists and returns empty map when no credentials
         // Full integration test would require mocking the keyring
-        let manager = CredentialManager::new();
+        let _manager = CredentialManager::new();
 
         // In a real test, we would use tokio and potentially mock keyring
         // For now, we just verify the function compiles
-        assert!(true); // Placeholder
     }
 }

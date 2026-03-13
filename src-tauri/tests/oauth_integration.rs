@@ -5,17 +5,7 @@
 
 use chamber::models::auth::{AuthType, Credential, OAuthConfig};
 use chamber::services::CredentialManager;
-
-/// Mock OAuth server configuration
-///
-/// In production, these URLs point to real OAuth endpoints.
-/// For testing, we validate the configuration without making actual network calls.
-struct MockOAuthConfig {
-    /// Mock authorization endpoint (not used in tests, just validated)
-    pub auth_url: String,
-    /// Mock token endpoint (not used in tests, just validated)
-    pub token_url: String,
-}
+use std::sync::Arc;
 
 #[cfg(test)]
 mod integration_tests {
@@ -53,7 +43,7 @@ mod integration_tests {
 
         // Step 3: Simulate storing the credential (skip actual token exchange in test)
         // In real flow, user would authorize and we'd get a code
-        let mock_code = "test_authorization_code";
+        let _mock_code = "test_authorization_code";
         let mock_access_token = "test_access_token";
         let mock_refresh_token = "test_refresh_token";
         let expires_at = chrono::Utc::now().timestamp() + 3600;
@@ -310,7 +300,7 @@ mod integration_tests {
 
         // List providers when none are stored
         let providers = manager.list_providers().await.unwrap();
-        assert!(providers.is_empty() || providers.len() == 0);
+        assert!(providers.is_empty());
     }
 
     #[tokio::test]
@@ -352,8 +342,8 @@ mod integration_tests {
         // State parameters should be different
         assert!(url1.contains(&format!("state={}", state1)));
         assert!(url2.contains(&format!("state={}", state2)));
-        assert!(!url1.contains(&state2));
-        assert!(!url2.contains(&state1));
+        assert!(!url1.contains(state2));
+        assert!(!url2.contains(state1));
     }
 
     #[tokio::test]
@@ -410,7 +400,7 @@ mod integration_tests {
         }
 
         // Verify all were stored
-        let providers = manager.list_providers().await.unwrap();
+        let providers: Vec<String> = manager.list_providers().await.unwrap();
         assert_eq!(providers.len(), 5);
     }
 }

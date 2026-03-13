@@ -30,7 +30,7 @@ pub async fn send_message(
     session_id: String,
     content: String,
     sidecar_state: State<'_, SidecarState>,
-) -> Result<(), String> {
+) -> Result<Option<String>, String> {
     tracing::info!("Sending message to session: {}", session_id);
 
     let manager_lock = sidecar_state.manager.lock().await;
@@ -48,8 +48,15 @@ pub async fn send_message(
                     tracing::error!("Sidecar returned error: {}", error_msg);
                     return Err(error_msg);
                 }
+                // Extract AI response content from data.response
+                let ai_response = response
+                    .data
+                    .as_ref()
+                    .and_then(|d| d.get("response"))
+                    .and_then(|r| r.as_str())
+                    .map(|s| s.to_string());
                 tracing::info!("Message sent successfully");
-                Ok(())
+                Ok(ai_response)
             }
             Err(e) => {
                 tracing::error!("Failed to send message to sidecar: {}", e);

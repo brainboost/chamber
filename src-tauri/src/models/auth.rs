@@ -12,14 +12,19 @@ pub struct Credential {
 
 /// Type of authentication credential
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "auth_type", rename_all = "snake_case")]
 pub enum AuthType {
-    /// Traditional API key stored in config
+    /// Traditional API key (e.g., sk-ant-...)
     ApiKey {
         /// The API key value
         key: String,
     },
-    /// OAuth token with refresh capability
+    /// Bearer token from subscription/setup (e.g., JWT-like tokens)
+    BearerToken {
+        /// The bearer token value
+        token: String,
+    },
+    /// OAuth token with refresh capability (for providers like Gemini)
     OAuthToken {
         /// Current access token
         access_token: String,
@@ -37,7 +42,48 @@ impl Credential {
     pub fn get_token(&self) -> Option<String> {
         match &self.auth_type {
             AuthType::ApiKey { key } => Some(key.clone()),
+            AuthType::BearerToken { token } => Some(token.clone()),
             AuthType::OAuthToken { access_token, .. } => Some(access_token.clone()),
+        }
+    }
+
+    /// Detect the authentication type from a token string (for Anthropic)
+    pub fn detect_anthropic_auth_type(token: &str) -> AuthType {
+        let trimmed = token.trim();
+
+        // OAuth access tokens (sk-ant-oat...) — use Bearer header
+        if trimmed.starts_with("sk-ant-oat") {
+            return AuthType::BearerToken {
+                token: trimmed.to_string(),
+            };
+        }
+
+        // JWT-like tokens (3 parts separated by dots) are Bearer tokens
+        if trimmed.matches('.').count() >= 2 {
+            return AuthType::BearerToken {
+                token: trimmed.to_string(),
+            };
+        }
+
+        // Classic API keys (sk-ant-api...) use x-api-key header
+        if trimmed.starts_with("sk-ant") {
+            return AuthType::ApiKey {
+                key: trimmed.to_string(),
+            };
+        }
+
+        // Default to API key for backward compatibility
+        AuthType::ApiKey {
+            key: trimmed.to_string(),
+        }
+    }
+
+    /// Get the HTTP header name and value for API requests
+    pub fn get_auth_header(&self) -> (String, String) {
+        match &self.auth_type {
+            AuthType::ApiKey { .. } => ("x-api-key".to_string(), self.get_token().unwrap()),
+            AuthType::BearerToken { .. } => ("authorization".to_string(), format!("Bearer {}", self.get_token().unwrap())),
+            AuthType::OAuthToken { .. } => ("authorization".to_string(), format!("Bearer {}", self.get_token().unwrap())),
         }
     }
 
@@ -54,6 +100,7 @@ impl Credential {
                 }
             }
             AuthType::ApiKey { .. } => false,
+            AuthType::BearerToken { .. } => false, // Bearer tokens don't expire in the same way
         }
     }
 
@@ -62,6 +109,14 @@ impl Credential {
         Self {
             provider,
             auth_type: AuthType::ApiKey { key },
+        }
+    }
+
+    /// Create a new bearer token credential
+    pub fn bearer_token(provider: String, token: String) -> Self {
+        Self {
+            provider,
+            auth_type: AuthType::BearerToken { token },
         }
     }
 
@@ -108,25 +163,35 @@ impl OAuthConfig {
         match provider {
             "anthropic" => Some(OAuthConfig {
                 provider: "anthropic".to_string(),
-                auth_url: "https://claude.ai/oauthauthorize".to_string(),
-                token_url: "https://claude.ai/api/oauth/token".to_string(),
-                scopes: vec!["openid".to_string(), "profile".to_string(), "offline_access".to_string()],
-                client_id: None,
-                redirect_uri: "chamber://oauth/callback".to_string(),
-            }),
-            "gemini" => Some(OAuthConfig {
-                provider: "gemini".to_string(),
-                auth_url: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
-                token_url: "https://oauth2.googleapis.com/token".to_string(),
-                scopes: vec!["https://www.googleapis.com/auth/generative.language".to_string()],
+                auth_url: "https://claude.ai/oauth/authorize".to_string(),
+                // Token endpoint discovered from Claude Code CLI binary
+                token_url: "https://platform.claude.com/v1/oauth/token".to_string(),
+                // Scopes used by Claude Code CLI for subscription access
+                scopes: vec![
+                    "user:profile".to_string(),
+                    "user:inference".to_string(),
+                    "user:sessions:claude_code".to_string(),
+                    "user:mcp_servers".to_string(),
+                ],
+                // Claude Code CLI's own client_id (public PKCE, no secret needed).
+                // Can be overridden with ANTHROPIC_OAUTH_CLIENT_ID env var.
                 client_id: Some(
-                    "684799299962-6kgfpt7cdq1q7jcji9tpgs3f9c3j7j9e.apps.googleusercontent.com"
-                        .to_string(),
+                    std::env::var("ANTHROPIC_OAUTH_CLIENT_ID")
+                        .unwrap_or_else(|_| "9d1c250a-e61b-44d9-88ed-5944d1962f5e".to_string())
                 ),
                 redirect_uri: "chamber://oauth/callback".to_string(),
             }),
+            // Gemini uses API keys only — no public OAuth client available
+            // "gemini" => ...
             _ => None,
         }
+    }
+
+    /// Get OAuth configuration with a custom redirect URI
+    pub fn for_provider_with_redirect(provider: &str, redirect_uri: String) -> Option<Self> {
+        let mut config = Self::for_provider(provider)?;
+        config.redirect_uri = redirect_uri;
+        Some(config)
     }
 }
 

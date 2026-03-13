@@ -49,13 +49,15 @@ export interface SidecarConfig {
 }
 
 // Authentication types
-export type AuthType = "api_key" | "oauth_token";
+export type AuthType = "api_key" | "bearer_token" | "oauth_token";
 
 export interface Credential {
   provider: string;
   auth_type: AuthType;
   // For API Key type
   key?: string;
+  // For Bearer Token type
+  token?: string;
   // For OAuth Token type
   access_token?: string;
   refresh_token?: string;
@@ -66,6 +68,11 @@ export interface Credential {
 export interface ApiKeyCredential extends Credential {
   auth_type: "api_key";
   key: string;
+}
+
+export interface BearerTokenCredential extends Credential {
+  auth_type: "bearer_token";
+  token: string;
 }
 
 export interface OAuthTokenCredential extends Credential {

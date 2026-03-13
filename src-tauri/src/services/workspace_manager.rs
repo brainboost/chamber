@@ -150,7 +150,6 @@ status: {:?}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::session::SessionStatus;
     use tempfile::TempDir;
 
     #[test]

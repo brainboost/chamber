@@ -9,8 +9,9 @@
     authLoading,
     authError,
     clearAuthError,
+    setupOAuthListeners,
   } from "$lib/stores/credentials";
-  import { checkEnvFileForMigration, migrateFromEnvFile } from "$lib/services/auth";
+  import { checkEnvFileForMigration, migrateFromEnvFile, checkClaudeCodeCredential, importClaudeCodeCredential, openAnthropicOAuthWebview, pushCredentialsToSidecar } from "$lib/services/auth";
   import OAuthModal from "$lib/components/auth/OAuthModal.svelte";
   import type { ChamberConfig } from "$lib/types/config";
   import { onMount } from "svelte";
@@ -25,6 +26,9 @@
   let hasEnvFile = $state(false);
   let isMigrating = $state(false);
   let migrationComplete = $state<string[] | null>(null);
+
+  // Claude Code CLI import state
+  let hasClaudeCodeCredential = $state(false);
 
   // API key input states
   let apiKeyInputs = $state<Record<string, string>>({
@@ -46,6 +50,8 @@
     await loadCredentials();
     // Check for migration opportunity
     hasEnvFile = await checkEnvFileForMigration();
+    // Check if Claude Code CLI credentials are available
+    hasClaudeCodeCredential = await checkClaudeCodeCredential();
   });
 
   async function handleSave() {
@@ -83,10 +89,47 @@
     }
   }
 
+  // Import from Claude Code CLI
+  async function handleImportClaudeCode() {
+    try {
+      clearAuthError();
+      const imported = await importClaudeCodeCredential();
+      if (imported) {
+        await loadCredentials();
+        // Push to sidecar so it can use the token immediately
+        await pushCredentialsToSidecar();
+        hasClaudeCodeCredential = false;
+        saveMessage = { type: "success", text: "Anthropic credentials imported from Claude Code!" };
+        setTimeout(() => (saveMessage = null), 4000);
+      }
+    } catch (error) {
+      saveMessage = {
+        type: "error",
+        text: error instanceof Error ? error.message : "Failed to import credentials",
+      };
+    }
+  }
+
   // Authentication handlers
   async function handleConnectOAuth(provider: string) {
     clearAuthError();
     await startOAuthFlow(provider);
+  }
+
+  // Anthropic uses an in-app webview (intercepts claude.ai redirect)
+  async function handleConnectAnthropicWebview() {
+    clearAuthError();
+    try {
+      // Ensure event listeners are ready before opening the window
+      await setupOAuthListeners();
+      await openAnthropicOAuthWebview();
+      // Result arrives via 'oauth-success' / 'oauth-error' Tauri events
+    } catch (error) {
+      saveMessage = {
+        type: "error",
+        text: error instanceof Error ? error.message : "Failed to open sign-in window",
+      };
+    }
   }
 
   function handleShowApiKeyInput(provider: string) {
@@ -94,21 +137,29 @@
   }
 
   async function handleSaveApiKey(provider: string) {
-    const key = apiKeyInputs[provider].trim();
-    if (!key) return;
+    const token = apiKeyInputs[provider].trim();
+    if (!token) return;
 
     try {
-      const { createApiKeyCredential, saveCredential: saveCred } = await import("$lib/stores/credentials");
-      const credential = createApiKeyCredential(provider, key);
+      const { saveCredential: saveCred } = await import("$lib/stores/credentials");
+      const { detectCredentialType } = await import("$lib/services/auth");
+
+      // Auto-detect credential type (API key vs Bearer token)
+      const credential = detectCredentialType(provider, token);
       await saveCred(credential);
+      // Push to sidecar so it picks up the new credential immediately
+      await pushCredentialsToSidecar();
       apiKeyInputs[provider] = "";
       showApiKeyInput[provider] = false;
-      saveMessage = { type: "success", text: "API key saved successfully!" };
+      saveMessage = {
+        type: "success",
+        text: `Credential saved successfully! (${credential.auth_type === 'bearer_token' ? 'Token' : 'API Key'})`
+      };
       setTimeout(() => (saveMessage = null), 3000);
     } catch (error) {
       saveMessage = {
         type: "error",
-        text: error instanceof Error ? error.message : "Failed to save API key",
+        text: error instanceof Error ? error.message : "Failed to save credential",
       };
     }
   }
@@ -430,7 +481,6 @@
 
       <div class="space-y-4">
         <!-- Anthropic -->
-        {@const anthropicStatus = $providerStatus.anthropic}
         <div class="border border-gray-200 rounded-lg p-4">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-3">
@@ -439,23 +489,28 @@
               </div>
               <div>
                 <h3 class="font-semibold text-gray-900">Anthropic Claude</h3>
-                {#if anthropicStatus?.has_credential}
+                {#if $providerStatus.anthropic?.has_credential}
                   <p class="text-sm text-green-600">
-                    Connected via {anthropicStatus.auth_type === 'oauth_token' ? 'OAuth' : 'API Key'}
+                    Connected via {$providerStatus.anthropic.auth_type === 'bearer_token' || $providerStatus.anthropic.auth_type === 'oauth_token' ? 'Subscription Token' : 'API Key'}
                   </p>
                 {:else}
                   <p class="text-sm text-gray-500">Not connected</p>
                 {/if}
               </div>
             </div>
-            <div class="flex gap-2">
-              {#if anthropicStatus?.has_credential}
+            <div class="flex gap-2 flex-wrap justify-end">
+              {#if $providerStatus.anthropic?.has_credential}
                 <Button variant="secondary" onclick={() => handleDisconnect('anthropic')}>
                   Disconnect
                 </Button>
               {:else}
-                <Button variant="primary" onclick={() => handleConnectOAuth('anthropic')} disabled={$authLoading}>
-                  Connect with OAuth
+                {#if hasClaudeCodeCredential}
+                  <Button variant="primary" onclick={handleImportClaudeCode} disabled={$authLoading}>
+                    Import from Claude Code
+                  </Button>
+                {/if}
+                <Button variant={hasClaudeCodeCredential ? 'secondary' : 'primary'} onclick={handleConnectAnthropicWebview} disabled={$authLoading}>
+                  Sign in with Browser
                 </Button>
                 {#if !showApiKeyInput.anthropic}
                   <Button variant="secondary" onclick={() => handleShowApiKeyInput('anthropic')} disabled={$authLoading}>
@@ -465,12 +520,15 @@
               {/if}
             </div>
           </div>
-          {#if !anthropicStatus?.has_credential && showApiKeyInput.anthropic}
+          {#if !$providerStatus.anthropic?.has_credential && showApiKeyInput.anthropic}
             <div class="mt-3 pt-3 border-t border-gray-200">
+              <p class="text-sm text-gray-600 mb-2">
+                Paste your API key (<code class="bg-gray-100 px-1 rounded">sk-ant-api03-...</code>) or subscription token (<code class="bg-gray-100 px-1 rounded">sk-ant-oat01-...</code>)
+              </p>
               <div class="flex gap-2">
                 <Input
                   type="password"
-                  placeholder="sk-ant-api03-..."
+                  placeholder="sk-ant-api03-... or sk-ant-oat01-..."
                   bind:value={apiKeyInputs.anthropic}
                   class="flex-1"
                 />
@@ -486,7 +544,6 @@
         </div>
 
         <!-- Gemini -->
-        {@const geminiStatus = $providerStatus.gemini}
         <div class="border border-gray-200 rounded-lg p-4">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-3">
@@ -495,9 +552,9 @@
               </div>
               <div>
                 <h3 class="font-semibold text-gray-900">Google Gemini</h3>
-                {#if geminiStatus?.has_credential}
+                {#if $providerStatus.gemini?.has_credential}
                   <p class="text-sm text-green-600">
-                    Connected via {geminiStatus.auth_type === 'oauth_token' ? 'OAuth' : 'API Key'}
+                    Connected via {$providerStatus.gemini.auth_type === 'oauth_token' ? 'OAuth' : 'API Key'}
                   </p>
                 {:else}
                   <p class="text-sm text-gray-500">Not connected</p>
@@ -505,23 +562,20 @@
               </div>
             </div>
             <div class="flex gap-2">
-              {#if geminiStatus?.has_credential}
+              {#if $providerStatus.gemini?.has_credential}
                 <Button variant="secondary" onclick={() => handleDisconnect('gemini')}>
                   Disconnect
                 </Button>
               {:else}
-                <Button variant="primary" onclick={() => handleConnectOAuth('gemini')} disabled={$authLoading}>
-                  Connect with OAuth
-                </Button>
                 {#if !showApiKeyInput.gemini}
-                  <Button variant="secondary" onclick={() => handleShowApiKeyInput('gemini')} disabled={$authLoading}>
-                    Use API Key
+                  <Button variant="primary" onclick={() => handleShowApiKeyInput('gemini')} disabled={$authLoading}>
+                    Add API Key
                   </Button>
                 {/if}
-              </div>
+              {/if}
             </div>
           </div>
-          {#if !geminiStatus?.has_credential && showApiKeyInput.gemini}
+          {#if !$providerStatus.gemini?.has_credential && showApiKeyInput.gemini}
             <div class="mt-3 pt-3 border-t border-gray-200">
               <div class="flex gap-2">
                 <Input
@@ -542,7 +596,6 @@
         </div>
 
         <!-- xAI -->
-        {@const xaiStatus = $providerStatus.xai}
         <div class="border border-gray-200 rounded-lg p-4">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-3">
@@ -551,7 +604,7 @@
               </div>
               <div>
                 <h3 class="font-semibold text-gray-900">xAI Grok</h3>
-                {#if xaiStatus?.has_credential}
+                {#if $providerStatus.xai?.has_credential}
                   <p class="text-sm text-green-600">Connected via API Key</p>
                 {:else}
                   <p class="text-sm text-gray-500">Not connected</p>
@@ -559,7 +612,7 @@
               </div>
             </div>
             <div class="flex gap-2">
-              {#if xaiStatus?.has_credential}
+              {#if $providerStatus.xai?.has_credential}
                 <Button variant="secondary" onclick={() => handleDisconnect('xai')}>
                   Disconnect
                 </Button>
@@ -572,7 +625,7 @@
               {/if}
             </div>
           </div>
-          {#if !xaiStatus?.has_credential && showApiKeyInput.xai}
+          {#if !$providerStatus.xai?.has_credential && showApiKeyInput.xai}
             <div class="mt-3 pt-3 border-t border-gray-200">
               <div class="flex gap-2">
                 <Input

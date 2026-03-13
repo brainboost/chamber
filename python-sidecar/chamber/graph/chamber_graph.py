@@ -275,11 +275,29 @@ Provide your synthesis and clearly state your decision at the end."""
 Synthesize the best insights from all models into a coherent response."""
         )
 
-        messages = [system_prompt] + state["messages"]
+        # Anthropic API treats a trailing AIMessage as "continue this turn" and
+        # may return empty content. Add a closing HumanMessage so the model
+        # generates a proper new response.
+        messages = [system_prompt] + state["messages"] + [
+            HumanMessage(content="Please provide your final answer to the user based on the above reasoning.")
+        ]
 
         response = await self.orchestrator.ainvoke(messages)
+        logger.info(f"Finalize response: type={type(response.content).__name__}, value={response.content!r}")
 
-        state["messages"].append(AIMessage(content=f"[FINAL ANSWER]\n{response.content}"))
+        # response.content may be a list of content blocks — extract text
+        raw = response.content
+        if isinstance(raw, list):
+            text = " ".join(
+                block["text"] if isinstance(block, dict) else getattr(block, "text", "")
+                for block in raw
+                if (isinstance(block, dict) and block.get("type") == "text")
+                or hasattr(block, "text")
+            )
+        else:
+            text = str(raw)
+
+        state["messages"].append(AIMessage(content=f"[FINAL ANSWER]\n{text}"))
 
         return state
 

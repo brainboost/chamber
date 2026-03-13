@@ -1,6 +1,8 @@
 import { writable, type Writable } from 'svelte/store';
+import { listen } from '@tauri-apps/api/event';
 import type { Credential, ProviderAuthStatus } from '$lib/types/config';
 import * as auth from '$lib/services/auth';
+import { pushCredentialsToSidecar } from '$lib/services/auth';
 
 // Map of provider -> Credential
 export const credentials: Writable<Record<string, Credential>> = writable({});
@@ -138,8 +140,17 @@ export async function startOAuthFlow(provider: string): Promise<void> {
     currentAuthProvider.set(provider);
     authModalOpen.set(true);
 
-    const authUrl = await auth.startOAuthFlow(provider);
-    oauthAuthorizationUrl.set(authUrl);
+    // Start OAuth flow and get auth URL + callback port
+    const [authUrl, port] = await auth.startOAuthFlow(provider);
+
+    // Open the authorization URL in the default browser
+    await auth.openOAuthUrl(authUrl);
+
+    // Listen for OAuth success/error events from Tauri
+    await setupOAuthListeners();
+
+    // Show a message in the modal
+    oauthAuthorizationUrl.set(`Browser opened. Please complete the authorization in your browser and return here.`);
   } catch (error) {
     console.error('Failed to start OAuth flow:', error);
     authError.set(error instanceof Error ? error.message : 'Failed to start OAuth flow');
@@ -149,6 +160,63 @@ export async function startOAuthFlow(provider: string): Promise<void> {
   } finally {
     authLoading.set(false);
   }
+}
+
+/**
+ * Set up event listeners for OAuth callbacks (idempotent).
+ * Call before opening any OAuth flow so events are wired up.
+ */
+export async function setupOAuthListeners(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if ((window as any).__oauthListenersSetup) return;
+  (window as any).__oauthListenersSetup = true;
+
+  const unlistenSuccess = await listen<string>('oauth-success', (event) => {
+    console.log('OAuth successful for provider:', event.payload);
+    handleOAuthSuccess(event.payload);
+  });
+
+  const unlistenError = await listen<string>('oauth-error', (event) => {
+    console.error('OAuth error:', event.payload);
+    handleOAuthError(event.payload);
+  });
+
+  (window as any).__oauthUnlisten = [unlistenSuccess, unlistenError];
+}
+
+/**
+ * Handle successful OAuth authentication
+ */
+async function handleOAuthSuccess(provider: string) {
+  try {
+    authLoading.set(true);
+
+    // Reload credentials to get the newly stored one
+    await loadCredentials();
+
+    // Push new token to sidecar so it can be used immediately
+    await pushCredentialsToSidecar().catch(() => {/* sidecar not running — no-op */});
+
+    // Close modal
+    authModalOpen.set(false);
+    currentAuthProvider.set(null);
+    oauthAuthorizationUrl.set(null);
+    authError.set(null);
+  } catch (error) {
+    console.error('Failed to handle OAuth success:', error);
+    authError.set(error instanceof Error ? error.message : 'Failed to complete authentication');
+  } finally {
+    authLoading.set(false);
+  }
+}
+
+/**
+ * Handle OAuth error
+ */
+function handleOAuthError(error: string) {
+  authLoading.set(false);
+  authError.set(error);
+  // Don't close modal - let user see the error and retry
 }
 
 /**

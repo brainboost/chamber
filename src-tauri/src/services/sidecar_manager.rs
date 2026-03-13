@@ -2,7 +2,8 @@ use crate::models::config::SidecarConfig;
 use crate::models::message::{SidecarRequest, SidecarResponse};
 use anyhow::{Context, Result};
 use std::collections::HashMap;
-use std::process::{Child, Command};
+use std::io::Read;
+use std::process::{Child, ChildStderr, Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -11,6 +12,7 @@ use tokio::time::sleep;
 pub struct SidecarManager {
     config: SidecarConfig,
     process: Arc<Mutex<Option<Child>>>,
+    process_stderr: Arc<Mutex<Option<ChildStderr>>>,
     restart_count: Arc<Mutex<u32>>,
     credential_manager: Option<Arc<Mutex<Option<super::CredentialManager>>>>,
 }
@@ -20,6 +22,7 @@ impl SidecarManager {
         Self {
             config,
             process: Arc::new(Mutex::new(None)),
+            process_stderr: Arc::new(Mutex::new(None)),
             restart_count: Arc::new(Mutex::new(0)),
             credential_manager: None,
         }
@@ -32,16 +35,18 @@ impl SidecarManager {
         Self {
             config,
             process: Arc::new(Mutex::new(None)),
+            process_stderr: Arc::new(Mutex::new(None)),
             restart_count: Arc::new(Mutex::new(0)),
             credential_manager: Some(credential_manager),
         }
     }
 
     pub async fn start(&self, sidecar_path: &str) -> Result<()> {
-        let mut process = self.process.lock().await;
-
-        if process.is_some() {
-            return Ok(()); // Already running
+        {
+            let process = self.process.lock().await;
+            if process.is_some() {
+                return Ok(()); // Already running
+            }
         }
 
         // Fetch credentials from credential manager if available
@@ -61,16 +66,36 @@ impl SidecarManager {
             HashMap::new()
         };
 
-        #[cfg(target_os = "windows")]
-        let executable = format!("{}.exe", sidecar_path);
-        #[cfg(not(target_os = "windows"))]
-        let executable = sidecar_path.to_string();
+        // Run the sidecar via `uv run python -m chamber.main` from the project directory.
+        // For a production bundled binary, sidecar_path would be the executable itself;
+        // detect that case by checking whether the path is a directory.
+        let path = std::path::Path::new(sidecar_path);
+        let mut cmd = if path.is_dir() {
+            // Development / uv-managed mode
+            let mut c = Command::new("uv");
+            c.args(["run", "python", "-m", "chamber.main"])
+                .arg("--host")
+                .arg(&self.config.host)
+                .arg("--port")
+                .arg(self.config.port.to_string())
+                .current_dir(sidecar_path)
+                .stderr(Stdio::piped());
+            c
+        } else {
+            // Production bundled binary
+            #[cfg(target_os = "windows")]
+            let executable = format!("{}.exe", sidecar_path);
+            #[cfg(not(target_os = "windows"))]
+            let executable = sidecar_path.to_string();
 
-        let mut cmd = Command::new(&executable);
-        cmd.arg("--host")
-            .arg(&self.config.host)
-            .arg("--port")
-            .arg(self.config.port.to_string());
+            let mut c = Command::new(&executable);
+            c.arg("--host")
+                .arg(&self.config.host)
+                .arg("--port")
+                .arg(self.config.port.to_string())
+                .stderr(Stdio::piped());
+            c
+        };
 
         // Inject credentials as environment variables
         // Python providers will read these via os.getenv() during initialization
@@ -79,13 +104,29 @@ impl SidecarManager {
             cmd.env(key, value);
         }
 
-        let child = cmd
-            .spawn()
-            .context("Failed to start Python sidecar")?;
+        let mut child = cmd.spawn().with_context(|| {
+            if path.is_dir() {
+                format!(
+                    "Failed to launch sidecar via `uv run` in '{}'. \
+                    Is `uv` installed? Run: winget install astral-sh.uv  (or: pip install uv)\n\
+                    Then run: cd {} && uv sync",
+                    sidecar_path, sidecar_path
+                )
+            } else {
+                format!("Failed to start sidecar binary '{}'", sidecar_path)
+            }
+        })?;
 
-        *process = Some(child);
+        // Take stderr handle before storing the child
+        let stderr_handle = child.stderr.take();
 
-        // Wait for sidecar to be ready
+        {
+            let mut process = self.process.lock().await;
+            *process = Some(child);
+        }
+        *self.process_stderr.lock().await = stderr_handle;
+
+        // Wait for sidecar to become healthy (lock is released above)
         self.wait_for_ready().await?;
 
         Ok(())
@@ -93,11 +134,13 @@ impl SidecarManager {
 
     pub async fn stop(&self) -> Result<()> {
         let mut process = self.process.lock().await;
-
         if let Some(mut child) = process.take() {
             child.kill().context("Failed to kill sidecar process")?;
             child.wait().context("Failed to wait for sidecar process")?;
         }
+        drop(process);
+
+        *self.process_stderr.lock().await = None;
 
         Ok(())
     }
@@ -138,19 +181,67 @@ impl SidecarManager {
     }
 
     async fn wait_for_ready(&self) -> Result<()> {
-        let max_attempts = 30;
-        let mut attempts = 0;
+        let max_attempts = 30; // 15 seconds total
 
-        while attempts < max_attempts {
-            if self.health_check().await? {
+        for _ in 0..max_attempts {
+            // Check if the process exited early (crash, import error, port conflict, etc.)
+            let exit_status = {
+                let mut process_lock = self.process.lock().await;
+                if let Some(child) = process_lock.as_mut() {
+                    match child.try_wait() {
+                        Ok(Some(status)) => {
+                            *process_lock = None; // Clear the dead handle
+                            Some(status)
+                        }
+                        _ => None, // Still running or couldn't check
+                    }
+                } else {
+                    None
+                }
+            };
+
+            if let Some(status) = exit_status {
+                // Process died — collect stderr to explain why
+                let stderr_text = {
+                    let mut stderr_lock = self.process_stderr.lock().await;
+                    if let Some(mut stderr) = stderr_lock.take() {
+                        let mut buf = String::new();
+                        let _ = stderr.read_to_string(&mut buf);
+                        buf.trim().to_string()
+                    } else {
+                        String::new()
+                    }
+                };
+
+                if stderr_text.is_empty() {
+                    anyhow::bail!(
+                        "Sidecar process exited unexpectedly ({}). \
+                        Check that Python dependencies are installed: cd python-sidecar && uv sync",
+                        status
+                    );
+                } else {
+                    anyhow::bail!(
+                        "Sidecar process exited unexpectedly ({}):\n{}",
+                        status,
+                        stderr_text
+                    );
+                }
+            }
+
+            if self.health_check().await.unwrap_or(false) {
                 return Ok(());
             }
 
             sleep(Duration::from_millis(500)).await;
-            attempts += 1;
         }
 
-        anyhow::bail!("Sidecar failed to become ready within timeout")
+        anyhow::bail!(
+            "Sidecar did not respond to health checks within 15s on {}:{}. \
+            Check that port {} is not already in use.",
+            self.config.host,
+            self.config.port,
+            self.config.port
+        )
     }
 
     pub async fn send_message(&self, request: SidecarRequest) -> Result<SidecarResponse> {
@@ -163,7 +254,7 @@ impl SidecarManager {
         let response = client
             .post(&url)
             .json(&request)
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(120))
             .send()
             .await
             .context("Failed to send message to sidecar")?;
@@ -225,8 +316,18 @@ impl SidecarManager {
     }
 
     pub async fn is_running(&self) -> bool {
-        let process = self.process.lock().await;
-        process.is_some()
+        let mut process = self.process.lock().await;
+        if let Some(child) = process.as_mut() {
+            match child.try_wait() {
+                Ok(None) => true, // Still alive
+                _ => {
+                    *process = None; // Clean up dead handle
+                    false
+                }
+            }
+        } else {
+            false
+        }
     }
 
     pub async fn reset_restart_count(&self) {
