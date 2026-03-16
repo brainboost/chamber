@@ -37,9 +37,7 @@ class AnthropicProvider(BaseLLMProvider):
             if not self.api_key:
                 self.api_key = os.getenv("ANTHROPIC_API_KEY")
             if not self.api_key:
-                raise ValueError(
-                    "Neither ANTHROPIC_API_KEY nor ANTHROPIC_AUTH_TOKEN is set"
-                )
+                raise ValueError("Neither ANTHROPIC_API_KEY nor ANTHROPIC_AUTH_TOKEN is set")
 
     def get_model(self) -> BaseChatModel:
         """Get ChatAnthropic model instance."""

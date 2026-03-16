@@ -278,12 +278,20 @@ Synthesize the best insights from all models into a coherent response."""
         # Anthropic API treats a trailing AIMessage as "continue this turn" and
         # may return empty content. Add a closing HumanMessage so the model
         # generates a proper new response.
-        messages = [system_prompt] + state["messages"] + [
-            HumanMessage(content="Please provide your final answer to the user based on the above reasoning.")
-        ]
+        messages = (
+            [system_prompt]
+            + state["messages"]
+            + [
+                HumanMessage(
+                    content="Please provide your final answer to the user based on the above reasoning."
+                )
+            ]
+        )
 
         response = await self.orchestrator.ainvoke(messages)
-        logger.info(f"Finalize response: type={type(response.content).__name__}, value={response.content!r}")
+        logger.info(
+            f"Finalize response: type={type(response.content).__name__}, value={response.content!r}"
+        )
 
         # response.content may be a list of content blocks — extract text
         raw = response.content

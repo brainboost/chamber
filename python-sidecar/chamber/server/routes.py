@@ -22,12 +22,14 @@ graphs = {}
 
 class MessageRequest(BaseModel):
     """Message request model."""
+
     session_id: str
     message: dict
 
 
 class SidecarResponse(BaseModel):
     """Standard sidecar response."""
+
     success: bool
     data: Any = None
     error: str | None = None
@@ -35,6 +37,7 @@ class SidecarResponse(BaseModel):
 
 class CredentialsRequest(BaseModel):
     """Credential env vars pushed from the Tauri app."""
+
     env_vars: dict[str, str]
 
 
@@ -128,15 +131,12 @@ async def send_message(request: MessageRequest) -> SidecarResponse:
 
         return SidecarResponse(
             success=True,
-            data={"session_id": session_id, "status": "completed", "response": final_response}
+            data={"session_id": session_id, "status": "completed", "response": final_response},
         )
 
     except Exception as e:
         logger.error(f"Error processing message: {e}", exc_info=True)
-        return SidecarResponse(
-            success=False,
-            error=str(e)
-        )
+        return SidecarResponse(success=False, error=str(e))
 
 
 @router.post("/session/{session_id}/pause")
@@ -157,17 +157,11 @@ async def pause_session(session_id: str) -> SidecarResponse:
 
         # Save checkpoint (implement in production)
 
-        return SidecarResponse(
-            success=True,
-            data={"session_id": session_id, "status": "paused"}
-        )
+        return SidecarResponse(success=True, data={"session_id": session_id, "status": "paused"})
 
     except Exception as e:
         logger.error(f"Error pausing session: {e}")
-        return SidecarResponse(
-            success=False,
-            error=str(e)
-        )
+        return SidecarResponse(success=False, error=str(e))
 
 
 @router.post("/session/{session_id}/resume")
@@ -188,14 +182,8 @@ async def resume_session(session_id: str) -> SidecarResponse:
 
         # Load checkpoint (implement in production)
 
-        return SidecarResponse(
-            success=True,
-            data={"session_id": session_id, "status": "resumed"}
-        )
+        return SidecarResponse(success=True, data={"session_id": session_id, "status": "resumed"})
 
     except Exception as e:
         logger.error(f"Error resuming session: {e}")
-        return SidecarResponse(
-            success=False,
-            error=str(e)
-        )
+        return SidecarResponse(success=False, error=str(e))

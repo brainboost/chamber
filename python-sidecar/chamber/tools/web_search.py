@@ -1,6 +1,5 @@
 """Web Search Tool."""
 
-
 from langchain_core.tools import Tool
 from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 

@@ -53,7 +53,9 @@ manager = ConnectionManager()
 
 
 @websocket_router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, session_id: str = None):  # ty:ignore[invalid-parameter-default]
+async def websocket_endpoint(
+    websocket: WebSocket, session_id: str = None
+):  # ty:ignore[invalid-parameter-default]
     """WebSocket endpoint for real-time updates.
 
     Args:

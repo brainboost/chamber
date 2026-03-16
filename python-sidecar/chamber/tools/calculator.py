@@ -63,7 +63,7 @@ class CalculatorTool(ChamberTool):
         """
         try:
             # Parse expression into AST
-            tree = ast.parse(expression, mode='eval')
+            tree = ast.parse(expression, mode="eval")
 
             # Evaluate using safe AST traversal
             result = self._safe_eval(tree.body)

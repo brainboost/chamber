@@ -73,9 +73,7 @@ def setup_logging(
         if console_format == "colored":
             console_handler.setFormatter(ColoredFormatter(COLORED_FORMAT))
         elif console_format == "json":
-            console_handler.setFormatter(
-                jsonlogger.JsonFormatter(JSON_FORMAT)
-            )
+            console_handler.setFormatter(jsonlogger.JsonFormatter(JSON_FORMAT))
         else:  # text
             console_handler.setFormatter(logging.Formatter(DEFAULT_FORMAT))
 
