@@ -311,6 +311,31 @@ impl SidecarManager {
         Ok(sidecar_response)
     }
 
+    pub async fn send_credentials(&self, env_vars: std::collections::HashMap<String, String>) -> Result<SidecarResponse> {
+        let url = format!(
+            "http://{}:{}/api/credentials",
+            self.config.host, self.config.port
+        );
+
+        let body = serde_json::json!({ "env_vars": env_vars });
+
+        let client = reqwest::Client::new();
+        let response = client
+            .post(&url)
+            .json(&body)
+            .timeout(Duration::from_secs(10))
+            .send()
+            .await
+            .context("Failed to send credentials to sidecar")?;
+
+        let sidecar_response: SidecarResponse = response
+            .json()
+            .await
+            .context("Failed to parse credentials response")?;
+
+        Ok(sidecar_response)
+    }
+
     pub fn get_websocket_url(&self) -> String {
         format!("ws://{}:{}/ws", self.config.host, self.config.port)
     }

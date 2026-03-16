@@ -109,6 +109,7 @@ fn main() {
             chamber::commands::sidecar::health_check_sidecar,
             chamber::commands::sidecar::get_websocket_url,
             chamber::commands::sidecar::is_sidecar_running,
+            chamber::commands::sidecar::send_credentials,
             // Session commands
             chamber::commands::session::create_session,
             chamber::commands::session::send_message,
