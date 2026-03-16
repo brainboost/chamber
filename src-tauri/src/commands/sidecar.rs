@@ -1,5 +1,6 @@
 use crate::services::SidecarManager;
 use tauri::State;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -65,6 +66,24 @@ pub async fn get_websocket_url(state: State<'_, SidecarState>) -> Result<String,
 
     if let Some(manager) = manager_lock.as_ref() {
         Ok(manager.get_websocket_url())
+    } else {
+        Err("Sidecar manager not initialized".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn send_credentials(
+    state: State<'_, SidecarState>,
+    env_vars: HashMap<String, String>,
+) -> Result<(), String> {
+    let manager_lock = state.manager.lock().await;
+
+    if let Some(manager) = manager_lock.as_ref() {
+        manager
+            .send_credentials(env_vars)
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
     } else {
         Err("Sidecar manager not initialized".to_string())
     }

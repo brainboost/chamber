@@ -7,6 +7,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from langchain_core.messages import HumanMessage
+
 from chamber.state import create_initial_state
 from chamber.graph.chamber_graph import ChamberGraph
 
@@ -50,7 +52,6 @@ async def update_credentials(request: CredentialsRequest) -> SidecarResponse:
         os.environ[key] = value
         logger.info(f"Updated credential env: {key}")
     # Clear cached graphs so next request creates fresh providers with new credentials
-    sessions.clear()
     graphs.clear()
     return SidecarResponse(success=True, data={"updated": list(request.env_vars.keys())})
 
