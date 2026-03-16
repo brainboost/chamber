@@ -57,6 +57,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Build frontend (required by tauri::generate_context!)
+        run: npm ci && npm run build
+
       - name: Install system dependencies (Tauri / WebKit)
         run: |
           sudo apt-get update
