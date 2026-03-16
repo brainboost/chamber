@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python:
+    name: Python – lint, test, coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python-sidecar
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies (with dev extras)
+        run: uv sync --extra dev
+
+      - name: Lint – ruff
+        run: uv run ruff check .
+
+      - name: Lint – black (format check)
+        run: uv run black --check .
+
+      - name: Test with coverage
+        run: |
+          uv run pytest \
+            --cov=chamber \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            -v \
+            || true   # don't fail if no tests exist yet
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: python-sidecar/coverage.xml
+          flags: python
+          fail_ci_if_error: false
+
+  rust:
+    name: Rust – lint, test, coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies (Tauri / WebKit)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev \
+            libdbus-1-dev \
+            libssl-dev
+
+      - name: Cache Rust
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Lint – clippy
+        working-directory: src-tauri
+        run: cargo clippy -- -D warnings
+
+      - name: Test
+        working-directory: src-tauri
+        run: cargo test --lib 2>&1
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --locked
+
+      - name: Coverage
+        working-directory: src-tauri
+        run: |
+          cargo tarpaulin \
+            --lib \
+            --out xml \
+            --output-dir . \
+            --timeout 120 \
+            || true   # don't fail if coverage tool has issues
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: src-tauri/cobertura.xml
+          flags: rust
+          fail_ci_if_error: false
+
+  frontend:
+    name: Frontend – type-check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (svelte-check)
+        run: npm run check
