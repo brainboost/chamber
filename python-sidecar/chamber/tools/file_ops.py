@@ -1,8 +1,6 @@
 """File Operations Tool."""
 
-import os
 from pathlib import Path
-from typing import Any
 
 from langchain_core.tools import Tool
 

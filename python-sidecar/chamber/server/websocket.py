@@ -1,8 +1,6 @@
 """WebSocket Streaming for Chamber Sidecar."""
 
-import json
 import logging
-from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -71,7 +69,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = None):  # t
     try:
         while True:
             # Receive messages (for keep-alive or client commands)
-            data = await websocket.receive_text()
+            _ = await websocket.receive_text()
 
             # Echo back for now (in production, handle commands)
             await websocket.send_json({"type": "ack", "data": "received"})

@@ -1,7 +1,5 @@
 """Web Search Tool."""
 
-import os
-from typing import Any
 
 from langchain_core.tools import Tool
 from langchain_community.utilities import DuckDuckGoSearchAPIWrapper

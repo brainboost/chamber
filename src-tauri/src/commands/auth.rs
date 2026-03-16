@@ -611,7 +611,7 @@ pub async fn open_anthropic_oauth_webview(
         // Google OAuth blocks all embedded WebViews at the browser engine level.
         // When the user clicks "Authorize with Google", redirect the window to a
         // static in-app page explaining they must use email/password instead.
-        if url.host_str().map_or(false, |h| h.contains("accounts.google") || h == "google.com") {
+        if url.host_str().is_some_and(|h| h.contains("accounts.google") || h == "google.com") {
             if let Some(win) = app_for_nav.get_webview_window("anthropic-oauth") {
                 let _ = win.navigate(
                     "data:text/html,<html><body style='font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f8fafc'><div style='max-width:360px;text-align:center;padding:32px'><div style='font-size:48px;margin-bottom:16px'>🔒</div><h2 style='margin:0 0 12px;color:#1e293b'>Google sign-in unavailable</h2><p style='color:#64748b;line-height:1.6;margin:0 0 24px'>Google blocks sign-in inside embedded browsers.<br><br>Please go back and sign in with your <strong>email and password</strong> instead.</p><button onclick='history.back()' style='background:#2563eb;color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:15px'>← Go back</button></div></body></html>".parse().expect("valid data URL")
